@@ -1,37 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
-import { sendMessage, generateImage, StreamChunk } from '../services/geminiService';
-import { AVAILABLE_MODELS, ChatMessage } from '../types';
-import { v4 as uuidv4 } from 'uuid'; // We need a UUID library now
+import { sendMessage, generateImage } from '../services/geminiService.js';
+import { v4 as uuidv4 } from 'uuid';
 
-const ChevronRightIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+const AVAILABLE_MODELS = [
+    { id: 'gemini-flash-latest', name: 'Gemini Flash Latest', aliases: ['flash', 'f'] },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', aliases: ['pro', 'p'] },
+    { id: 'gemini-flash-lite-latest', name: 'Gemini Flash Lite', aliases: ['lite', 'l'] },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', aliases: [] },
+];
+
+const ChevronRightIcon = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
         <path d="m9 18 6-6-6-6" />
     </svg>
 );
 
-type Stage = 'model' | 'search' | 'chatting';
+const Terminal = () => {
+    const [stage, setStage] = useState('model');
+    const [sessionId] = useState(uuidv4());
+    const [selectedModel, setSelectedModel] = useState('');
+    const [useGoogleSearch, setUseGoogleSearch] = useState(false);
 
-const Terminal: React.FC = () => {
-    const [stage, setStage] = useState<Stage>('model');
-    const [sessionId] = useState<string>(uuidv4()); // Unique ID for this user session
-    const [selectedModel, setSelectedModel] = useState<string>('');
-    const [useGoogleSearch, setUseGoogleSearch] = useState<boolean>(false);
-
-    const [history, setHistory] = useState<ChatMessage[]>([]);
+    const [history, setHistory] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
-    const [showSources, setShowSources] = useState<Record<string, boolean>>({});
+    const [showSources, setShowSources] = useState({});
 
-    const inputRef = useRef<HTMLInputElement>(null);
-    const endOfHistoryRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef(null);
+    const endOfHistoryRef = useRef(null);
 
     useEffect(() => {
+        // FIX: Add missing undefined argument for sources.
         addMessage('system', [
             'Welcome to the Gemini Interactive Terminal.',
             `Type 'flash', 'pro', 'lite', or 'extra' to choose a model.`,
-        ]);
+        ], undefined);
     }, []);
 
     useEffect(() => {
@@ -42,16 +47,17 @@ const Terminal: React.FC = () => {
         endOfHistoryRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [history, isStreaming]);
 
-    const addMessage = (sender: ChatMessage['sender'], content: string | string[], sources?: ChatMessage['sources'], isImage: boolean = false) => {
+    const addMessage = (sender, content, sources, isImage = false) => {
         setHistory(prev => [...prev, { id: Date.now().toString() + Math.random(), sender, content, sources, isImage }]);
     };
     
-    const handleTerminalCommand = async (command: string) => {
+    const handleTerminalCommand = async (command) => {
        if (stage === 'model') {
             const extraModels = command === 'extra';
             if (extraModels) {
                 const modelList = AVAILABLE_MODELS.map((m, i) => `${i + 1}. ${m.name} (${m.id})`);
-                addMessage('system', ["Please choose a model by number:", ...modelList]);
+                // FIX: Add missing undefined argument for sources.
+                addMessage('system', ["Please choose a model by number:", ...modelList], undefined);
                 return;
             }
 
@@ -66,37 +72,44 @@ const Terminal: React.FC = () => {
             if (model) {
                 setSelectedModel(model.id);
                 setStage('search');
-                addMessage('system', `Model set to ${model.name}. Use Google Search for grounding? (y/n)`);
+                // FIX: Add missing undefined argument for sources.
+                addMessage('system', `Model set to ${model.name}. Use Google Search for grounding? (y/n)`, undefined);
             } else {
-                addMessage('system', "Invalid model selection. Type 'flash', 'pro', 'lite', or 'extra'.");
+                // FIX: Add missing undefined argument for sources.
+                addMessage('system', "Invalid model selection. Type 'flash', 'pro', 'lite', or 'extra'.", undefined);
             }
         } else if (stage === 'search') {
             const shouldUseSearch = command === 'y' || command === 'yes';
             setUseGoogleSearch(shouldUseSearch);
-            addMessage('system', `Google Search ${shouldUseSearch ? 'enabled' : 'disabled'}. You can now start chatting.`);
+            // FIX: Add missing undefined argument for sources.
+            addMessage('system', `Google Search ${shouldUseSearch ? 'enabled' : 'disabled'}. You can now start chatting.`, undefined);
             setStage('chatting');
         } else if (stage === 'chatting') {
             await processChat(command);
         }
     };
 
-    const processChat = async (prompt: string) => {
+    const processChat = async (prompt) => {
         if (prompt.startsWith('make an image')) {
             const imagePrompt = prompt.replace('make an image', '').trim();
             if (!imagePrompt) {
-                addMessage('system', 'Please provide a prompt for the image. Usage: make an image [your prompt]');
+                // FIX: Add missing undefined argument for sources.
+                addMessage('system', 'Please provide a prompt for the image. Usage: make an image [your prompt]', undefined);
                 return;
             }
-            addMessage('system', `Generating image for: "${imagePrompt}"...`);
+            // FIX: Add missing undefined argument for sources.
+            addMessage('system', `Generating image for: "${imagePrompt}"...`, undefined);
             const result = await generateImage(imagePrompt, sessionId);
             
             if (result.error) {
-                addMessage('system', result.error);
+                // FIX: Add missing undefined argument for sources.
+                addMessage('system', result.error, undefined);
             } else if(result.imageUrl) {
                 addMessage('gemini', result.imageUrl, undefined, true);
             }
             const modelName = AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || 'selected';
-            addMessage('system', `Returning to your chat with the ${modelName} model.`);
+            // FIX: Add missing undefined argument for sources.
+            addMessage('system', `Returning to your chat with the ${modelName} model.`, undefined);
             return;
         }
 
@@ -105,7 +118,7 @@ const Terminal: React.FC = () => {
         setIsStreaming(true);
 
         let currentText = '';
-        await sendMessage(prompt, selectedModel, useGoogleSearch, sessionId, (chunk: StreamChunk) => {
+        await sendMessage(prompt, selectedModel, useGoogleSearch, sessionId, (chunk) => {
             if (chunk.text) {
                 currentText += chunk.text;
                 setHistory(prev => prev.map(msg => 
@@ -122,12 +135,13 @@ const Terminal: React.FC = () => {
         setIsStreaming(false);
     };
 
-    const handleUserInput = async (e: React.FormEvent) => {
+    const handleUserInput = async (e) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
 
         const command = input.trim();
-        addMessage('user', input);
+        // FIX: Add missing undefined argument for sources.
+        addMessage('user', input, undefined);
         setInput('');
 
         setIsLoading(true);
@@ -136,7 +150,8 @@ const Terminal: React.FC = () => {
         } catch (error) {
             console.error(error);
             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-            addMessage('system', `Error: ${errorMessage}`);
+            // FIX: Add missing undefined argument for sources.
+            addMessage('system', `Error: ${errorMessage}`, undefined);
         }
         setIsLoading(false);
     };
@@ -150,25 +165,17 @@ const Terminal: React.FC = () => {
             default: return "Type your command...";
         }
     };
-    
-    // Add a useEffect to handle the new dependency
-    useEffect(() => {
-        // Since we are adding a new dependency, we need to handle potential side-effects.
-        // For this case, we just log to the console when the component mounts.
-        // In a real app, you might fetch initial data here.
-        console.log("Terminal component mounted");
-    }, []);
 
-    const renderContent = (msg: ChatMessage) => {
+    const renderContent = (msg) => {
         if (msg.isImage) {
-            return <img src={msg.content as string} alt="Generated" className="mt-2 rounded-lg max-w-sm" />;
+            return <img src={msg.content} alt="Generated" className="mt-2 rounded-lg max-w-sm" />;
         }
         if (Array.isArray(msg.content)) {
             return msg.content.map((line, index) => <div key={index}>{line}</div>);
         }
 
-        let rawMarkup = marked.parse(msg.content as string) as string;
-        
+        let rawMarkup = marked.parse(msg.content)
+
         const lastMessage = history[history.length - 1];
         if (isStreaming && msg.id === lastMessage.id && msg.sender === 'gemini') {
             rawMarkup += `<span class="blinking-cursor inline-block w-[1px] h-4 bg-gray-800 dark:bg-gray-200 ml-1"></span>`;
@@ -185,7 +192,7 @@ const Terminal: React.FC = () => {
                        {msg.sender === 'user' && (
                             <div className="flex">
                                 <span className="flex-shrink-0 text-blue-500 dark:text-blue-400 font-bold">user@gemini:~$</span>
-                                <p className="ml-2 flex-grow">{msg.content as string}</p>
+                                <p className="ml-2 flex-grow">{msg.content}</p>
                             </div>
                         )}
                         {msg.sender === 'gemini' && (

@@ -1,19 +1,10 @@
-import { GroundingChunk } from '@google/genai';
-
-export interface StreamChunk {
-    text?: string;
-    sources?: GroundingChunk[];
-    error?: string;
-    imageUrl?: string;
-}
-
 export const sendMessage = async (
-    prompt: string,
-    model: string,
-    useGoogleSearch: boolean,
-    sessionId: string,
-    onChunk: (chunk: StreamChunk) => void
-): Promise<void> => {
+    prompt,
+    model,
+    useGoogleSearch,
+    sessionId,
+    onChunk
+) => {
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
@@ -42,8 +33,12 @@ export const sendMessage = async (
             
             for (const line of lines) {
                  if (line.startsWith('data:')) {
-                    const data = JSON.parse(line.substring(5));
-                    onChunk(data);
+                    try {
+                        const data = JSON.parse(line.substring(5));
+                        onChunk(data);
+                    } catch (e) {
+                        console.error("Failed to parse stream chunk JSON:", line);
+                    }
                 }
             }
         }
@@ -55,7 +50,7 @@ export const sendMessage = async (
 };
 
 
-export const generateImage = async (prompt: string, sessionId: string): Promise<StreamChunk> => {
+export const generateImage = async (prompt, sessionId) => {
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',

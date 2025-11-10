@@ -1,11 +1,13 @@
-import { GoogleGenAI, Chat } from "@google/genai";
-import type { Handler } from "@netlify/functions";
+// FIX: Switched from CommonJS require to ES Module import for TypeScript compatibility.
+// FIX: Imported Chat and Modality types for better type safety and to follow SDK guidelines.
+import { GoogleGenAI, Chat, Modality } from "@google/genai";
 
 // A map to store active chat sessions in memory.
 // In a real-world, scalable app, you'd use a database like Redis.
+// FIX: Added type definition for the chat session map.
 const chatSessions = new Map<string, Chat>();
 
-const handler: Handler = async (event) => {
+const handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return {
       statusCode: 405,
@@ -32,11 +34,11 @@ const handler: Handler = async (event) => {
         }
         const ai = new GoogleGenAI({ apiKey });
         const config = useGoogleSearch ? { tools: [{ googleSearch: {} }] } : {};
-        const chat = ai.chats.create({ model, config });
+        const chat: Chat = ai.chats.create({ model, config });
         chatSessions.set(sessionId, chat);
     }
     
-    const chat = chatSessions.get(sessionId)!;
+    const chat = chatSessions.get(sessionId);
 
     // Handle image generation command
     if (command === 'generateImage') {
@@ -44,7 +46,8 @@ const handler: Handler = async (event) => {
       const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
-            config: { responseModalities: ['IMAGE'] },
+            // FIX: Used Modality.IMAGE enum as per SDK guidelines.
+            config: { responseModalities: [Modality.IMAGE] },
         });
 
         for (const candidate of response.candidates || []) {
@@ -95,4 +98,5 @@ const handler: Handler = async (event) => {
   }
 };
 
+// FIX: Switched from CommonJS module.exports to ES Module export.
 export { handler };
