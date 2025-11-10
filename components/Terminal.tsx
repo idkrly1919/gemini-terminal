@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
-import { Chat } from '@google/genai';
-import { initializeChat, generateImage } from '../services/geminiService';
+import { sendMessage, generateImage, StreamChunk } from '../services/geminiService';
 import { AVAILABLE_MODELS, ChatMessage } from '../types';
+import { v4 as uuidv4 } from 'uuid'; // We need a UUID library now
 
 const ChevronRightIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -10,42 +10,33 @@ const ChevronRightIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     </svg>
 );
 
+type Stage = 'model' | 'search' | 'chatting';
+
 const Terminal: React.FC = () => {
-    const [stage, setStage] = useState<'model' | 'search' | 'chatting'>('model');
+    const [stage, setStage] = useState<Stage>('model');
+    const [sessionId] = useState<string>(uuidv4()); // Unique ID for this user session
     const [selectedModel, setSelectedModel] = useState<string>('');
-    const [chat, setChat] = useState<Chat | null>(null);
+    const [useGoogleSearch, setUseGoogleSearch] = useState<boolean>(false);
 
     const [history, setHistory] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isStreaming, setIsStreaming] = useState(false);
     const [showSources, setShowSources] = useState<Record<string, boolean>>({});
-    const [isApiKeyMissing, setIsApiKeyMissing] = useState(false);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const endOfHistoryRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!process.env.API_KEY) {
-            setIsApiKeyMissing(true);
-            addMessage('system', [
-                'ERROR: Gemini API Key not found.',
-                'Please create a file named ".env" in the root of this project.',
-                'Inside the .env file, add the following line:',
-                'API_KEY=your_api_key_here',
-                'Then, restart the development server.',
-            ]);
-        } else {
-            addMessage('system', [
-                'Welcome to the Gemini Interactive Terminal.',
-                `First, choose a model. Type 'flash', 'pro', 'lite', or 'extra' for more options.`,
-            ]);
-        }
+        addMessage('system', [
+            'Welcome to the Gemini Interactive Terminal.',
+            `Type 'flash', 'pro', 'lite', or 'extra' to choose a model.`,
+        ]);
     }, []);
 
     useEffect(() => {
         inputRef.current?.focus();
-    }, [isLoading, isApiKeyMissing]);
+    }, [isLoading, stage]);
 
     useEffect(() => {
         endOfHistoryRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -54,9 +45,9 @@ const Terminal: React.FC = () => {
     const addMessage = (sender: ChatMessage['sender'], content: string | string[], sources?: ChatMessage['sources'], isImage: boolean = false) => {
         setHistory(prev => [...prev, { id: Date.now().toString() + Math.random(), sender, content, sources, isImage }]);
     };
-
+    
     const handleTerminalCommand = async (command: string) => {
-        if (stage === 'model') {
+       if (stage === 'model') {
             const extraModels = command === 'extra';
             if (extraModels) {
                 const modelList = AVAILABLE_MODELS.map((m, i) => `${i + 1}. ${m.name} (${m.id})`);
@@ -80,29 +71,16 @@ const Terminal: React.FC = () => {
                 addMessage('system', "Invalid model selection. Type 'flash', 'pro', 'lite', or 'extra'.");
             }
         } else if (stage === 'search') {
-            const useGoogleSearch = command === 'y' || command === 'yes';
-            addMessage('system', `Google Search ${useGoogleSearch ? 'enabled' : 'disabled'}. You can now start chatting.`);
-            try {
-                const newChat = initializeChat(selectedModel, useGoogleSearch);
-                setChat(newChat);
-                setStage('chatting');
-            } catch(e) {
-                const errorMsg = e instanceof Error ? e.message : String(e);
-                addMessage('system', `Error initializing chat session: ${errorMsg}`);
-                setStage('model'); 
-                addMessage('system', "Configuration reset. Please select a model again.");
-            }
+            const shouldUseSearch = command === 'y' || command === 'yes';
+            setUseGoogleSearch(shouldUseSearch);
+            addMessage('system', `Google Search ${shouldUseSearch ? 'enabled' : 'disabled'}. You can now start chatting.`);
+            setStage('chatting');
         } else if (stage === 'chatting') {
-            if (!chat) {
-                addMessage('system', 'Error: Chat not initialized. Resetting configuration.');
-                setStage('model');
-                return;
-            }
-            await processChat(chat, command);
+            await processChat(command);
         }
     };
 
-    const processChat = async (chatInstance: Chat, prompt: string) => {
+    const processChat = async (prompt: string) => {
         if (prompt.startsWith('make an image')) {
             const imagePrompt = prompt.replace('make an image', '').trim();
             if (!imagePrompt) {
@@ -110,11 +88,12 @@ const Terminal: React.FC = () => {
                 return;
             }
             addMessage('system', `Generating image for: "${imagePrompt}"...`);
-            const imageUrl = await generateImage(imagePrompt);
-            if (imageUrl.startsWith('Error:')) {
-                addMessage('system', imageUrl);
-            } else {
-                addMessage('gemini', imageUrl, undefined, true);
+            const result = await generateImage(imagePrompt, sessionId);
+            
+            if (result.error) {
+                addMessage('system', result.error);
+            } else if(result.imageUrl) {
+                addMessage('gemini', result.imageUrl, undefined, true);
             }
             const modelName = AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || 'selected';
             addMessage('system', `Returning to your chat with the ${modelName} model.`);
@@ -125,27 +104,27 @@ const Terminal: React.FC = () => {
         setHistory(prev => [...prev, { id: messageId, sender: 'gemini', content: '', sources: [], isImage: false }]);
         setIsStreaming(true);
 
-        try {
-            const stream = await chatInstance.sendMessageStream({ message: prompt });
-            let text = '';
-            let finalResponse;
-            for await (const chunk of stream) {
-                text += chunk.text;
-                setHistory(prev => prev.map(msg => msg.id === messageId ? { ...msg, content: text } : msg));
-                finalResponse = chunk;
+        let currentText = '';
+        await sendMessage(prompt, selectedModel, useGoogleSearch, sessionId, (chunk: StreamChunk) => {
+            if (chunk.text) {
+                currentText += chunk.text;
+                setHistory(prev => prev.map(msg => 
+                    msg.id === messageId ? { ...msg, content: currentText, sources: chunk.sources || msg.sources } : msg
+                ));
             }
-            setHistory(prev => prev.map(msg => msg.id === messageId ? { ...msg, sources: finalResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks } : msg));
-        } catch (e) {
-             const errorMsg = e instanceof Error ? e.message : String(e);
-             setHistory(prev => prev.map(msg => msg.id === messageId ? { ...msg, content: `An error occurred: ${errorMsg}` } : msg));
-        } finally {
-            setIsStreaming(false);
-        }
+             if (chunk.error) {
+                 setHistory(prev => prev.map(msg => 
+                    msg.id === messageId ? { ...msg, content: `An error occurred: ${chunk.error}` } : msg
+                ));
+             }
+        });
+
+        setIsStreaming(false);
     };
 
     const handleUserInput = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!input.trim() || isLoading || isApiKeyMissing) return;
+        if (!input.trim() || isLoading) return;
 
         const command = input.trim();
         addMessage('user', input);
@@ -161,6 +140,24 @@ const Terminal: React.FC = () => {
         }
         setIsLoading(false);
     };
+
+    const getPlaceholderText = () => {
+        if (isLoading) return "Processing...";
+        switch(stage) {
+            case 'model': return "Select a model ('flash', 'pro', 'lite', 'extra')...";
+            case 'search': return "Enable Google Search? (y/n)...";
+            case 'chatting': return "Type your message or a command...";
+            default: return "Type your command...";
+        }
+    };
+    
+    // Add a useEffect to handle the new dependency
+    useEffect(() => {
+        // Since we are adding a new dependency, we need to handle potential side-effects.
+        // For this case, we just log to the console when the component mounts.
+        // In a real app, you might fetch initial data here.
+        console.log("Terminal component mounted");
+    }, []);
 
     const renderContent = (msg: ChatMessage) => {
         if (msg.isImage) {
@@ -229,9 +226,9 @@ const Terminal: React.FC = () => {
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder={isApiKeyMissing ? "API Key not configured. See instructions above." : isLoading ? "Processing..." : "Type your command..."}
+                        placeholder={getPlaceholderText()}
                         className="w-full bg-transparent p-2 ml-2 focus:outline-none"
-                        disabled={isLoading || isApiKeyMissing}
+                        disabled={isLoading}
                         aria-label="Terminal input"
                     />
                 </div>
