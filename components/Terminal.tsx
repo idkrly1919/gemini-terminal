@@ -1,26 +1,25 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
-import { sendMessage, generateImage } from '../services/geminiService.ts';
 import { v4 as uuidv4 } from 'uuid';
+import { GoogleGenAI, Chat, Modality } from '@google/genai';
 
 const AVAILABLE_MODELS = [
     { id: 'gemini-flash-latest', name: 'Gemini Flash Latest', aliases: ['flash', 'f'] },
     { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', aliases: ['pro', 'p'] },
     { id: 'gemini-flash-lite-latest', name: 'Gemini Flash Lite', aliases: ['lite', 'l'] },
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', aliases: [] },
 ];
 
 const ChevronRightIcon = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
         <path d="m9 18 6-6-6-6" />
     </svg>
 );
 
 const Terminal = () => {
     const [stage, setStage] = useState('model');
-    const [sessionId] = useState(uuidv4());
     const [selectedModel, setSelectedModel] = useState('');
     const [useGoogleSearch, setUseGoogleSearch] = useState(false);
+    const [chat, setChat] = useState<Chat | null>(null);
 
     const [history, setHistory] = useState([]);
     const [input, setInput] = useState('');
@@ -30,13 +29,33 @@ const Terminal = () => {
 
     const inputRef = useRef(null);
     const endOfHistoryRef = useRef(null);
+    
+    const addMessage = (sender, content, sources, isImage = false) => {
+        const messageContent = Array.isArray(content) ? content.join('\n') : content;
+        setHistory(prev => [...prev, { id: uuidv4(), sender, content: messageContent, sources, isImage }]);
+    };
+    
+    const showWelcomeMessage = () => {
+        const modelList = AVAILABLE_MODELS.map(m => `*   **${m.name}**: type \`${m.aliases[0]}\``);
+        addMessage('system', [
+            '# Welcome to the Gemini Interactive Terminal!',
+            'To get started, select a model from the list below:',
+            ...modelList,
+        // FIX: Added undefined for the sources argument.
+        ], undefined);
+    };
+
+    const initialize = () => {
+        setStage('model');
+        setSelectedModel('');
+        setUseGoogleSearch(false);
+        setChat(null);
+        setHistory([]);
+        showWelcomeMessage();
+    };
 
     useEffect(() => {
-        // FIX: Add missing undefined argument for sources.
-        addMessage('system', [
-            'Welcome to the Gemini Interactive Terminal.',
-            `Type 'flash', 'pro', 'lite', or 'extra' to choose a model.`,
-        ], undefined);
+        initialize();
     }, []);
 
     useEffect(() => {
@@ -46,111 +65,190 @@ const Terminal = () => {
     useEffect(() => {
         endOfHistoryRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [history, isStreaming]);
-
-    const addMessage = (sender, content, sources, isImage = false) => {
-        setHistory(prev => [...prev, { id: Date.now().toString() + Math.random(), sender, content, sources, isImage }]);
-    };
     
-    const handleTerminalCommand = async (command) => {
+    const startNewChatSession = (modelId, useSearch) => {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const config = useSearch ? { tools: [{ googleSearch: {} }] } : {};
+        const newChat = ai.chats.create({ model: modelId, config });
+        setChat(newChat);
+    };
+
+    const handleSetup = async (command) => {
        if (stage === 'model') {
-            const extraModels = command === 'extra';
-            if (extraModels) {
-                const modelList = AVAILABLE_MODELS.map((m, i) => `${i + 1}. ${m.name} (${m.id})`);
-                // FIX: Add missing undefined argument for sources.
-                addMessage('system', ["Please choose a model by number:", ...modelList], undefined);
-                return;
-            }
-
-            const modelNumber = parseInt(command, 10) - 1;
-            let model;
-            if (!isNaN(modelNumber) && modelNumber >= 0 && modelNumber < AVAILABLE_MODELS.length) {
-                model = AVAILABLE_MODELS[modelNumber];
-            } else {
-                model = AVAILABLE_MODELS.find(m => m.aliases.includes(command));
-            }
-
+            const model = AVAILABLE_MODELS.find(m => m.aliases.includes(command));
             if (model) {
                 setSelectedModel(model.id);
                 setStage('search');
-                // FIX: Add missing undefined argument for sources.
-                addMessage('system', `Model set to ${model.name}. Use Google Search for grounding? (y/n)`, undefined);
+                // FIX: Added undefined for the sources argument.
+                addMessage('system', `Model set to **${model.name}**. Use Google Search for grounding? (y/n)`, undefined);
             } else {
-                // FIX: Add missing undefined argument for sources.
-                addMessage('system', "Invalid model selection. Type 'flash', 'pro', 'lite', or 'extra'.", undefined);
+                // FIX: Added undefined for the sources argument.
+                addMessage('system', "Invalid model selection. Please choose from the list above.", undefined);
             }
         } else if (stage === 'search') {
             const shouldUseSearch = command === 'y' || command === 'yes';
             setUseGoogleSearch(shouldUseSearch);
-            // FIX: Add missing undefined argument for sources.
-            addMessage('system', `Google Search ${shouldUseSearch ? 'enabled' : 'disabled'}. You can now start chatting.`, undefined);
+            startNewChatSession(selectedModel, shouldUseSearch);
+            // FIX: Added undefined for the sources argument.
+            addMessage('system', `Google Search **${shouldUseSearch ? 'enabled' : 'disabled'}**. You can now start chatting.`, undefined);
+            // FIX: Added undefined for the sources argument.
+            addMessage('system', "Type `/help` to see available commands.", undefined);
             setStage('chatting');
-        } else if (stage === 'chatting') {
-            await processChat(command);
+        }
+    };
+    
+    const handleCommand = async (command) => {
+        const [cmd, ...args] = command.trim().substring(1).split(' ');
+        const argString = args.join(' ');
+
+        switch (cmd.toLowerCase()) {
+            case 'help':
+                // FIX: Added undefined for the sources argument.
+                addMessage('system', [
+                    '**Available Commands:**',
+                    '- `/help`: Show this help message.',
+                    '- `/clear`: Clear the terminal screen.',
+                    '- `/reset`: Reset the chat session to model selection.',
+                    '- `/model <name>`: Switch model (e.g., `/model pro`). Available: ' + AVAILABLE_MODELS.map(m => m.aliases[0]).join(', '),
+                    '- `/search <on|off>`: Turn Google Search grounding on or off.',
+                    '- `/image <prompt>`: Generate an image with the given prompt.',
+                ], undefined);
+                break;
+            case 'clear':
+                setHistory([]);
+                break;
+            case 'reset':
+                initialize();
+                break;
+            case 'model': {
+                const newModelAlias = argString.toLowerCase();
+                const model = AVAILABLE_MODELS.find(m => m.aliases.includes(newModelAlias));
+                if (model) {
+                    setSelectedModel(model.id);
+                    startNewChatSession(model.id, useGoogleSearch);
+                    // FIX: Added undefined for the sources argument.
+                    addMessage('system', `Model changed to **${model.name}**.`, undefined);
+                } else {
+                    // FIX: Added undefined for the sources argument.
+                    addMessage('system', `Invalid model. Available: ${AVAILABLE_MODELS.map(m => m.aliases[0]).join(', ')}`, undefined);
+                }
+                break;
+            }
+            case 'search': {
+                const setting = argString.toLowerCase();
+                if (setting === 'on' || setting === 'off') {
+                    const newSearchState = setting === 'on';
+                    setUseGoogleSearch(newSearchState);
+                    startNewChatSession(selectedModel, newSearchState);
+                    // FIX: Added undefined for the sources argument.
+                    addMessage('system', `Google Search is now **${newSearchState ? 'ON' : 'OFF'}**.`, undefined);
+                } else {
+                    // FIX: Added undefined for the sources argument.
+                    addMessage('system', `Invalid setting. Use \`/search on\` or \`/search off\`.`, undefined);
+                }
+                break;
+            }
+            case 'image':
+                await generateImage(argString);
+                break;
+            default:
+                // FIX: Added undefined for the sources argument.
+                addMessage('system', `Unknown command: \`/${cmd}\`. Type \`/help\` for a list of commands.`, undefined);
         }
     };
 
-    const processChat = async (prompt) => {
-        if (prompt.startsWith('make an image')) {
-            const imagePrompt = prompt.replace('make an image', '').trim();
-            if (!imagePrompt) {
-                // FIX: Add missing undefined argument for sources.
-                addMessage('system', 'Please provide a prompt for the image. Usage: make an image [your prompt]', undefined);
-                return;
-            }
-            // FIX: Add missing undefined argument for sources.
-            addMessage('system', `Generating image for: "${imagePrompt}"...`, undefined);
-            const result = await generateImage(imagePrompt, sessionId);
-            
-            if (result.error) {
-                // FIX: Add missing undefined argument for sources.
-                addMessage('system', result.error, undefined);
-            } else if(result.imageUrl) {
-                addMessage('gemini', result.imageUrl, undefined, true);
-            }
-            const modelName = AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || 'selected';
-            // FIX: Add missing undefined argument for sources.
-            addMessage('system', `Returning to your chat with the ${modelName} model.`, undefined);
+    const generateImage = async (prompt) => {
+        if (!prompt) {
+            // FIX: Added undefined for the sources argument.
+            addMessage('system', 'Please provide a prompt for the image. Usage: `/image [your prompt]`', undefined);
             return;
         }
+        // FIX: Added undefined for the sources argument.
+        addMessage('system', `Generating image for: "${prompt}"...`, undefined);
 
-        const messageId = Date.now().toString();
-        setHistory(prev => [...prev, { id: messageId, sender: 'gemini', content: '', sources: [], isImage: false }]);
-        setIsStreaming(true);
+        try {
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-image',
+                contents: { parts: [{ text: prompt }] },
+                config: { responseModalities: [Modality.IMAGE] },
+            });
 
-        let currentText = '';
-        await sendMessage(prompt, selectedModel, useGoogleSearch, sessionId, (chunk) => {
-            if (chunk.text) {
-                currentText += chunk.text;
+            let foundImage = false;
+            for (const candidate of response.candidates || []) {
+                for (const part of candidate.content.parts) {
+                    if (part.inlineData) {
+                        addMessage('gemini', `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`, undefined, true);
+                        foundImage = true;
+                        break;
+                    }
+                }
+                if (foundImage) break;
+            }
+            if (!foundImage) throw new Error("No image data found in API response.");
+
+            const modelName = AVAILABLE_MODELS.find(m => m.id === selectedModel)?.name || 'selected';
+            // FIX: Added undefined for the sources argument.
+            addMessage('system', `Returning to your chat with the ${modelName} model.`, undefined);
+        } catch (error) {
+            console.error("Image generation error:", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            // FIX: Added undefined for the sources argument.
+            addMessage('system', `Image Generation Error: ${errorMessage}`, undefined);
+        }
+    };
+    
+    const processChatMessage = async (prompt) => {
+        try {
+            if (!chat) throw new Error("Chat is not initialized.");
+
+            const messageId = uuidv4();
+            setHistory(prev => [...prev, { id: messageId, sender: 'gemini', content: '', sources: [], isImage: false }]);
+            setIsStreaming(true);
+
+            let currentText = '';
+            const stream = await chat.sendMessageStream({ message: prompt });
+            
+            for await (const chunk of stream) {
+                const text = chunk.text;
+                const sources = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
+                currentText += text;
                 setHistory(prev => prev.map(msg => 
-                    msg.id === messageId ? { ...msg, content: currentText, sources: chunk.sources || msg.sources } : msg
+                    msg.id === messageId ? { ...msg, content: currentText, sources: sources || msg.sources } : msg
                 ));
             }
-             if (chunk.error) {
-                 setHistory(prev => prev.map(msg => 
-                    msg.id === messageId ? { ...msg, content: `An error occurred: ${chunk.error}` } : msg
-                ));
-             }
-        });
-
-        setIsStreaming(false);
+        } catch (error) {
+            console.error("API error:", error);
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            // FIX: Added undefined for the sources argument.
+            addMessage('system', `Error: ${errorMessage}`, undefined);
+        } finally {
+            setIsStreaming(false);
+        }
     };
 
     const handleUserInput = async (e) => {
         e.preventDefault();
         if (!input.trim() || isLoading) return;
 
-        const command = input.trim();
-        // FIX: Add missing undefined argument for sources.
-        addMessage('user', input, undefined);
+        const userInput = input.trim();
+        // FIX: Added undefined for the sources argument.
+        addMessage('user', userInput, undefined);
         setInput('');
 
         setIsLoading(true);
         try {
-            await handleTerminalCommand(command.toLowerCase());
+            if (stage !== 'chatting') {
+                await handleSetup(userInput.toLowerCase());
+            } else if (userInput.startsWith('/')) {
+                await handleCommand(userInput);
+            } else {
+                await processChatMessage(userInput);
+            }
         } catch (error) {
             console.error(error);
             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-            // FIX: Add missing undefined argument for sources.
+            // FIX: Added undefined for the sources argument.
             addMessage('system', `Error: ${errorMessage}`, undefined);
         }
         setIsLoading(false);
@@ -159,9 +257,9 @@ const Terminal = () => {
     const getPlaceholderText = () => {
         if (isLoading) return "Processing...";
         switch(stage) {
-            case 'model': return "Select a model ('flash', 'pro', 'lite', 'extra')...";
+            case 'model': return "Select a model (e.g., 'flash', 'pro', 'lite')...";
             case 'search': return "Enable Google Search? (y/n)...";
-            case 'chatting': return "Type your message or a command...";
+            case 'chatting': return "Type a message or `/help` for commands...";
             default: return "Type your command...";
         }
     };
@@ -170,15 +268,12 @@ const Terminal = () => {
         if (msg.isImage) {
             return <img src={msg.content} alt="Generated" className="mt-2 rounded-lg max-w-sm" />;
         }
-        if (Array.isArray(msg.content)) {
-            return msg.content.map((line, index) => <div key={index}>{line}</div>);
-        }
-
-        let rawMarkup = marked.parse(msg.content)
+       
+        const rawMarkup = marked.parse(msg.content);
 
         const lastMessage = history[history.length - 1];
         if (isStreaming && msg.id === lastMessage.id && msg.sender === 'gemini') {
-            rawMarkup += `<span class="blinking-cursor inline-block w-[1px] h-4 bg-gray-800 dark:bg-gray-200 ml-1"></span>`;
+            return <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: rawMarkup + `<span class="blinking-cursor inline-block w-[1px] h-4 bg-gray-800 dark:bg-gray-200 ml-1"></span>` }} />;
         }
         
         return <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: rawMarkup }} />;
