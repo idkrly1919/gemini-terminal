@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
-import { sendMessage, generateImage } from '../services/geminiService.js';
+import { sendMessage, generateImage } from '../services/geminiService.ts';
 import { v4 as uuidv4 } from 'uuid';
 
 const AVAILABLE_MODELS = [
