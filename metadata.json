@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Terminal Chat",
+  "description": "A terminal-style chat application that allows users to interact with various Gemini models, toggle Google Search grounding, and generate images on the fly.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gemini Terminal Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* For custom scrollbars */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #1a202c; /* bg-gray-800 */
+      }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #4a5568; /* bg-gray-600 */
+        border-radius: 4px;
+      }
+      .dark ::-webkit-scrollbar-thumb:hover {
+        background: #718096; /* bg-gray-500 */
+      }
+      ::-webkit-scrollbar-track {
+        background: #e2e8f0; /* bg-gray-200 */
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #a0aec0; /* bg-gray-400 */
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #718096; /* bg-gray-500 */
+      }
+      
+      @keyframes blink {
+        50% { opacity: 0; }
+      }
+      .blinking-cursor {
+        animation: blink 1s step-end infinite;
+      }
+
+      /* Basic prose styles for markdown */
+      .prose h1, .prose h2, .prose h3 { margin-top: 1em; margin-bottom: 0.5em; font-weight: 600; }
+      .prose h1 { font-size: 1.5em; }
+      .prose h2 { font-size: 1.25em; }
+      .prose h3 { font-size: 1.1em; }
+      .prose p { margin-bottom: 1em; }
+      .prose ul, .prose ol { margin-left: 1.5em; margin-bottom: 1em; }
+      .prose li { margin-bottom: 0.25em; }
+      .prose code {
+        background-color: #e5e7eb; /* bg-gray-200 */
+        padding: 0.2em 0.4em;
+        margin: 0;
+        font-size: 85%;
+        border-radius: 3px;
+      }
+      .prose pre {
+        background-color: #e5e7eb; /* bg-gray-200 */
+        padding: 1em;
+        border-radius: 6px;
+        overflow-x: auto;
+      }
+       .prose pre code {
+        padding: 0;
+        background-color: transparent;
+      }
+      .dark .prose code { background-color: #374151; /* dark:bg-gray-700 */ }
+      .dark .prose pre { background-color: #1f2937; /* dark:bg-gray-800 */ }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.0",
+    "marked": "https://aistudiocdn.com/marked@^14.0.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
