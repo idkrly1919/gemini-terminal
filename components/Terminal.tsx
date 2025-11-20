@@ -20,13 +20,12 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 // API KEY SETUP FOR CLOUDFLARE PAGES / VITE
 // 1. In Cloudflare Pages -> Settings -> Environment Variables, add "VITE_API_KEY"
 // 2. Trigger a new deployment (Retry Deployment) so the builder can bake the key in.
-// NOTE: We use .trim() to remove accidental whitespace from copy-pasting.
-// Use optional chaining to prevent crash if environment is not injected correctly
-const API_KEY = (import.meta.env?.VITE_API_KEY || '').trim();
+// NOTE: We use .trim() to remove accidental whitespace and .replace() to remove quotes if pasted incorrectly.
+const API_KEY = (import.meta.env?.VITE_API_KEY || '').replace(/["']/g, '').trim();
 
 // Nexus Model Mapping
 const TEXT_MODELS = [
-    { id: 'gemini-2.5-pro-preview', name: 'Nexus K2.5 Pro' },
+    { id: 'gemini-2.5-pro-preview', name: 'Nexus K3.5 Pro' },
     { id: 'gemini-2.5-flash', name: 'Nexus K3.5 Latest' },
     { id: 'gemini-flash-lite-latest', name: 'Nexus K3' }
 ];
