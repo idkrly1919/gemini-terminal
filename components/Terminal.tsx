@@ -21,11 +21,10 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 // 1. In Cloudflare Pages -> Settings -> Environment Variables, add "VITE_API_KEY"
 // 2. Trigger a new deployment (Retry Deployment) so the builder can bake the key in.
 // NOTE: We use .trim() to remove accidental whitespace and .replace() to remove quotes if pasted incorrectly.
-const API_KEY = (import.meta.env?.VITE_API_KEY || '').replace(/["']/g, '').trim();
+const API_KEY = ((import.meta as any).env?.VITE_API_KEY || '').replace(/["']/g, '').trim();
 
 // Nexus Model Mapping
 const TEXT_MODELS = [
-    { id: 'gemini-2.5-pro-preview', name: 'Nexus K3.5 Pro' },
     { id: 'gemini-2.5-flash', name: 'Nexus K3.5 Latest' },
     { id: 'gemini-flash-lite-latest', name: 'Nexus K3' }
 ];
@@ -660,6 +659,7 @@ const Terminal = () => {
                 setMessages(prev => [...prev, { id: placeholderId, sender: 'gemini', content: '', isGeneratingImage: true, timestamp: Date.now() } as Message]);
 
                 const minWait = new Promise(resolve => setTimeout(resolve, 5000));
+                // ENFORCE Nano Banana (Flash Image)
                 const modelToUse = 'gemini-2.5-flash-image';
                 
                 const parts: any[] = [];
@@ -707,8 +707,8 @@ const Terminal = () => {
             const config: any = {};
 
             if (useDeepResearch) {
-                // REPLACED: gemini-3-pro-preview -> gemini-2.5-pro-preview
-                effectiveModel = 'gemini-2.5-pro-preview';
+                // Replaced Pro with Flash for better quota management
+                effectiveModel = 'gemini-2.5-flash';
                 config.thinkingConfig = { thinkingBudget: 8192 };
                 config.tools = [{ googleSearch: {} }];
                 effectiveSystemInstruction += "\n\n[DEEP RESEARCH MODE ACTIVE]\nYou are tasked with a DEEP RESEARCH operation. Search multiple sources, synthesize data, cross-reference facts, and provide a comprehensive, exhaustive, and well-structured report. Do not be superficial.";
@@ -786,6 +786,8 @@ const Terminal = () => {
             // Custom Error Handling for Common Issues
             if (err.message && err.message.includes('Failed to fetch')) {
                  errorMessage += "\n\n**POSSIBLE CAUSES:**\n1. **Google Cloud Restrictions:** Your API Key might be restricted to specific domains. Go to Google Cloud Console > Credentials > API Key > Website Restrictions and add `https://*.pages.dev/*`.\n2. **Ad Blockers:** uBlock Origin can block Google API calls. Try disabling it for this site.\n3. **Invalid API Key:** The key stored in Cloudflare might be incorrect.";
+            } else if (err.message && (err.message.includes('429') || err.message.includes('quota'))) {
+                 errorMessage += "\n\n**QUOTA REACHED:** Google's API limits have been hit. The 'Nano Banana' (Flash Image) model has a free tier of ~1,500 requests/day, but also rate limits per minute. Please try again in a moment.";
             } else if (err.message && err.message.includes('400')) {
                  errorMessage += "\n\n**API Key Invalid:** The API key provided is rejected by Google. Check that you copied it correctly in Cloudflare without spaces.";
             }
