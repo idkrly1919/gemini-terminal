@@ -18,18 +18,16 @@ const GOOGLE_CLIENT_ID = '521328066665-qbsiq4imv14vh1oe189od1j5ve28rbn9.apps.goo
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 // API KEY SETUP FOR CLOUDFLARE PAGES / VITE
-// 1. In Cloudflare Pages -> Settings -> Environment Variables, add "VITE_API_KEY"
-// 2. Trigger a new deployment (Retry Deployment) so the builder can bake the key in.
-// NOTE: We use .trim() to remove accidental whitespace and .replace() to remove quotes if pasted incorrectly.
 const API_KEY = ((import.meta as any).env?.VITE_API_KEY || '').replace(/["']/g, '').trim();
 
 // Nexus Model Mapping
 const TEXT_MODELS = [
+    { id: 'gemini-3-pro-preview', name: 'Nexus K4 Pro' },
     { id: 'gemini-2.5-flash', name: 'Nexus K3.5 Latest' },
     { id: 'gemini-flash-lite-latest', name: 'Nexus K3' }
 ];
 
-// Core Identity Rules - Applied to ALL personalities
+// Core Identity Rules
 const CORE_IDENTITY = `
 CRITICAL IDENTITY RULES:
 1. You are Nexus. You are a unique AI model.
@@ -62,9 +60,9 @@ const PERSONALITIES = {
     }
 };
 
-// Image Models - Updated to use Nano Banana (Flash Image) exclusively
+// Image Models
 const IMAGE_MODELS = [
-    { id: 'gemini-2.5-flash-image', name: 'Nexus Imageneer (Nano Banana)' }
+    { id: 'gemini-2.5-flash-image', name: 'Nexus Imageneer' }
 ];
 
 const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
@@ -89,6 +87,9 @@ const MicIcon = ({ active }) => (
 const SendIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
 );
+const StopIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+);
 const ChipIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M8.5 3v18"/><path d="M15.5 3v18"/><path d="M3 8.5h18"/><path d="M3 15.5h18"/></svg>
 );
@@ -112,6 +113,12 @@ const PlusIcon = () => (
 );
 const CloseIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+);
+const TrashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+);
+const DownloadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
 );
 
 // --- Audio Helpers ---
@@ -243,19 +250,33 @@ const LoadingOrb = ({ mode = 'normal' }: { mode?: 'normal' | 'deep' }) => (
 );
 
 const ImageGeneratingUI = () => (
-    <div className="w-full max-w-md bg-[#2f2f2f] border border-gray-700 rounded-lg p-4 shadow-lg">
-        <div className="flex items-center gap-3 mb-3">
-            <div className="animate-pulse text-blue-400">
-                <ImageIcon />
+    <div className="relative w-full max-w-[300px] bg-[#2f2f2f] rounded-xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-6 aspect-[3/4]">
+        {/* Shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+        
+        {/* Title - Handwritten style */}
+        <div className="text-2xl font-light text-gray-300 mb-8 tracking-wide" style={{ fontFamily: 'cursive' }}>generating</div>
+        
+        {/* Circle & Mountains sketch */}
+        <div className="relative w-32 h-32 mb-8 opacity-80">
+             {/* Sun/Moon */}
+            <div className="absolute top-0 left-2 w-12 h-12 border-2 border-gray-400 rounded-full"></div>
+            
+            {/* Mountains */}
+            <div className="absolute bottom-0 left-0 w-full h-20 flex items-end justify-center">
+                <svg viewBox="0 0 100 60" className="w-full h-full stroke-gray-400 fill-none stroke-2">
+                    <path d="M10 60 L35 10 L60 60" />
+                    <path d="M40 60 L65 20 L90 60" />
+                </svg>
             </div>
-            <span className="text-sm font-medium text-gray-200">Creating masterpiece...</span>
         </div>
-        <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-full rounded-full animate-progress"></div>
-        </div>
-        <div className="mt-2 flex justify-between text-xs text-gray-500">
-            <span>Nexus Imageneer</span>
-            <span>Estimated time: 5s</span>
+
+        {/* Text */}
+        <div className="text-xl font-light text-gray-400 tracking-widest mb-6">image...</div>
+
+        {/* Progress Bar */}
+        <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+            <div className="h-full bg-gray-300 rounded-full animate-[progress-fill_4s_ease-in-out_infinite]"></div>
         </div>
     </div>
 );
@@ -319,9 +340,10 @@ const Terminal = () => {
     const [hasStarted, setHasStarted] = useState(false);
     const [showChat, setShowChat] = useState(false);
     const [shouldAnimate, setShouldAnimate] = useState(false);
+    const [isDragOver, setIsDragOver] = useState(false);
     
     // Config State
-    const [modelId, setModelId] = useState('gemini-flash-lite-latest');
+    const [modelId, setModelId] = useState('gemini-3-pro-preview');
     const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
     const [useSearch, setUseSearch] = useState(true);
     const [useThinking, setUseThinking] = useState(false);
@@ -346,6 +368,7 @@ const Terminal = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [isGapiReady, setIsGapiReady] = useState(false);
     const hasLoadedFromDrive = useRef(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // Refs
     const chatEndRef = useRef(null);
@@ -354,6 +377,24 @@ const Terminal = () => {
     const liveSessionRef = useRef<any>(null);
     const nextStartTimeRef = useRef(0);
     const saveTimeoutRef = useRef<any>(null);
+
+    // Copy Button Logic
+    useEffect(() => {
+        const handleCopy = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const btn = target.closest('.code-copy-btn');
+            if (!btn) return;
+            const code = (btn as HTMLElement).dataset.code;
+            if (code) {
+                navigator.clipboard.writeText(decodeURIComponent(code));
+                const originalText = btn.textContent;
+                btn.textContent = "Copied!";
+                setTimeout(() => { if(btn) btn.textContent = originalText; }, 2000);
+            }
+        };
+        document.addEventListener('click', handleCopy);
+        return () => document.removeEventListener('click', handleCopy);
+    }, []);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -571,10 +612,6 @@ const Terminal = () => {
 
     // --- Chat Logic ---
 
-    const addMessage = (sender, content, extras = {}) => {
-        setMessages(prev => [...prev, { id: uuidv4(), sender, content, timestamp: Date.now(), ...extras } as Message]);
-    };
-
     const handleSelectSession = (session: ChatSession) => {
         if (session.id === currentSessionId && showChat) return; // Already active
         
@@ -586,13 +623,40 @@ const Terminal = () => {
         setIsSidebarOpen(false); // Close sidebar on mobile
     };
 
+    const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
+        e.stopPropagation();
+        const confirmed = window.confirm("Are you sure you want to delete this chat?");
+        if (confirmed) {
+            setSessions(prev => prev.filter(s => s.id !== sessionId));
+            if (currentSessionId === sessionId) {
+                setMessages([]);
+                setHasStarted(false);
+                setShowChat(false);
+            }
+        }
+    };
+
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+            setIsLoading(false);
+            // Remove streaming flag from last message
+            setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last && last.isStreaming) {
+                    return prev.map((m, i) => i === prev.length - 1 ? { ...m, isStreaming: false } : m);
+                }
+                return prev;
+            });
+        }
+    };
+
     const handleSend = async () => {
         if ((!input.trim() && attachments.length === 0) || isLoading) return;
         
-        // --- AUTH LIMIT CHECK ---
         if (!user) {
             const userMsgCount = messages.filter(m => m.sender === 'user').length;
-            // Allow 0 and 1 (2 messages total), block 3rd
             if (userMsgCount >= 2) {
                 setShowAuthModal(true);
                 return;
@@ -600,7 +664,7 @@ const Terminal = () => {
         }
 
         if (!API_KEY) {
-            addMessage('system', "CRITICAL ERROR: API Key is missing. Please check your Cloudflare Environment Variables (VITE_API_KEY).");
+            setMessages(prev => [...prev, { id: uuidv4(), sender: 'system', content: "CRITICAL ERROR: API Key missing.", timestamp: Date.now() } as Message]);
             return;
         }
 
@@ -611,14 +675,12 @@ const Terminal = () => {
         setInput('');
         setAttachments([]);
 
-        // Trigger animation only if not already started
         if (!hasStarted) {
             setShouldAnimate(true);
             setHasStarted(true);
             setShowChat(true);
         }
         
-        // Optimistic Update
         const newMessage: Message = { 
             id: uuidv4(), 
             role: 'user',
@@ -629,9 +691,11 @@ const Terminal = () => {
         };
         setMessages(prev => [...prev, newMessage]);
         setIsLoading(true);
+        
+        // Initialize AbortController
+        abortControllerRef.current = new AbortController();
 
         try {
-            // ROAST MASTER ESSAY REFUSAL LOGIC
             if (persona === 'insulting' && /(essay|homework|assignment|paper|thesis|dissertation)/i.test(lowerInput)) {
                 await new Promise(r => setTimeout(r, 800));
                 const refusalMsg: Message = { 
@@ -648,18 +712,15 @@ const Terminal = () => {
 
             const ai = new GoogleGenAI({ apiKey: API_KEY });
             
-            // --- Intent Detection Logic ---
-
+            // Image Gen Logic
             const isImageGen = /(generate|create|draw|make).*(image|picture|photo|drawing)/i.test(lowerInput);
             const isImageEdit = /(edit|change|modify|fix|add|remove)/i.test(lowerInput) && currentAttachments.length > 0;
             
-            // 1. Image Generation & Editing
             if ((isImageGen && !isImageEdit) || isImageEdit) {
                 const placeholderId = uuidv4();
                 setMessages(prev => [...prev, { id: placeholderId, sender: 'gemini', content: '', isGeneratingImage: true, timestamp: Date.now() } as Message]);
 
                 const minWait = new Promise(resolve => setTimeout(resolve, 5000));
-                // ENFORCE Nano Banana (Flash Image)
                 const modelToUse = 'gemini-2.5-flash-image';
                 
                 const parts: any[] = [];
@@ -701,22 +762,18 @@ const Terminal = () => {
                 return;
             }
 
-            // 3. Text / Multimodal Chat
+            // Text Chat
             let effectiveSystemInstruction = PERSONALITIES[persona].instruction;
             let effectiveModel = modelId;
             const config: any = {};
 
             if (useDeepResearch) {
-                // Replaced Pro with Flash for better quota management
-                effectiveModel = 'gemini-2.5-flash';
+                effectiveModel = 'gemini-2.5-flash'; // Using Flash for quota safety
                 config.thinkingConfig = { thinkingBudget: 8192 };
                 config.tools = [{ googleSearch: {} }];
-                effectiveSystemInstruction += "\n\n[DEEP RESEARCH MODE ACTIVE]\nYou are tasked with a DEEP RESEARCH operation. Search multiple sources, synthesize data, cross-reference facts, and provide a comprehensive, exhaustive, and well-structured report. Do not be superficial.";
+                effectiveSystemInstruction += "\n\n[DEEP RESEARCH MODE ACTIVE]\nYou are tasked with a DEEP RESEARCH operation.";
             } else {
                  if (useSearch) config.tools = [{ googleSearch: {} }];
-                 if (useThinking && modelId.includes('gemini-2.5-flash')) {
-                     config.thinkingConfig = { thinkingBudget: 2048 }; 
-                 }
             }
             config.systemInstruction = effectiveSystemInstruction;
 
@@ -759,6 +816,9 @@ const Terminal = () => {
             let accumulatedText = '';
             
             for await (const chunk of responseStream) {
+                // Check for abort
+                if (!abortControllerRef.current) break;
+
                 const textChunk = chunk.text || '';
                 accumulatedText += textChunk;
                 const grounding = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
@@ -781,26 +841,35 @@ const Terminal = () => {
             ));
 
         } catch (err) {
+            if (err.name === 'AbortError') return; // Ignore user abort
             let errorMessage = `Nexus System Error: ${err.message}`;
-            
-            // Custom Error Handling for Common Issues
-            if (err.message && err.message.includes('Failed to fetch')) {
-                 errorMessage += "\n\n**POSSIBLE CAUSES:**\n1. **Google Cloud Restrictions:** Your API Key might be restricted to specific domains. Go to Google Cloud Console > Credentials > API Key > Website Restrictions and add `https://*.pages.dev/*`.\n2. **Ad Blockers:** uBlock Origin can block Google API calls. Try disabling it for this site.\n3. **Invalid API Key:** The key stored in Cloudflare might be incorrect.";
-            } else if (err.message && (err.message.includes('429') || err.message.includes('quota'))) {
-                 errorMessage += "\n\n**QUOTA REACHED:** Google's API limits have been hit. The 'Nano Banana' (Flash Image) model has a free tier of ~1,500 requests/day, but also rate limits per minute. Please try again in a moment.";
-            } else if (err.message && err.message.includes('400')) {
-                 errorMessage += "\n\n**API Key Invalid:** The API key provided is rejected by Google. Check that you copied it correctly in Cloudflare without spaces.";
-            }
-
-            addMessage('system', errorMessage);
+            if (err.message && err.message.includes('Failed to fetch')) errorMessage += " (Check API Key Restrictions)";
+            setMessages(prev => [...prev, { id: uuidv4(), sender: 'system', content: errorMessage, timestamp: Date.now() } as Message]);
         } finally {
             setIsLoading(false);
+            abortControllerRef.current = null;
         }
     };
 
-    const handleFileUpload = (e) => {
-        const files = Array.from(e.target.files);
-        files.forEach((file: File) => {
+    // Drag & Drop
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(true);
+    };
+
+    const handleDragLeave = () => {
+        setIsDragOver(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragOver(false);
+        const files = Array.from(e.dataTransfer.files);
+        processFiles(files);
+    };
+
+    const processFiles = (files: File[]) => {
+         files.forEach((file: File) => {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const base64String = (reader.result as string).split(',')[1];
@@ -812,6 +881,13 @@ const Terminal = () => {
             };
             reader.readAsDataURL(file);
         });
+    }
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            processFiles(files);
+        }
     };
 
     const handleGoHome = () => {
@@ -848,9 +924,8 @@ const Terminal = () => {
             stopVoiceMode();
             return;
         }
-
         if (!API_KEY) {
-            alert("API Key is missing. Please check your configuration.");
+            alert("API Key missing");
             return;
         }
 
@@ -909,36 +984,70 @@ const Terminal = () => {
         }
     };
 
-    // --- Render ---
-
+    // --- Markdown Renderer with Copy Button ---
     const renderMarkdown = (content, isStreaming = false) => {
+        // Configure marked with custom renderer for code blocks
+        const renderer = new marked.Renderer();
+        renderer.code = ({ text, lang }) => {
+            const language = lang || 'plaintext';
+            return `
+            <div class="relative group my-4 rounded-lg overflow-hidden border border-gray-700">
+                <div class="flex items-center justify-between px-4 py-2 bg-[#1e1e1e] border-b border-gray-700">
+                    <span class="text-xs text-gray-400 font-mono">${language}</span>
+                    <button class="code-copy-btn flex items-center gap-1 text-xs text-gray-400 hover:text-white transition-colors" data-code="${encodeURIComponent(text)}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy
+                    </button>
+                </div>
+                <div class="p-4 bg-[#0d0d0d] overflow-x-auto">
+                    <code class="language-${language} text-sm font-mono text-gray-300 whitespace-pre">${text}</code>
+                </div>
+            </div>`;
+        };
+        
+        // Image Download Overlay
+        renderer.image = ({ href, title, text }) => {
+            return `
+            <div class="relative group inline-block rounded-lg overflow-hidden my-2">
+                <img src="${href}" alt="${text}" title="${title || ''}" class="max-w-full rounded-lg" />
+                <a href="${href}" download="nexus-generated-image.png" class="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-sm">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </a>
+            </div>`;
+        }
+
         const textToRender = isStreaming ? content + " ▋" : content;
-        const raw = marked.parse(textToRender);
+        const raw = marked(textToRender, { renderer });
         return <div className="prose prose-invert prose-p:text-gray-300 prose-headings:text-gray-100 max-w-none" dangerouslySetInnerHTML={{ __html: raw }} />;
     };
 
     return (
-        <div className="absolute inset-0 w-full h-full bg-[#212121] overflow-hidden">
+        <div 
+            className="absolute inset-0 w-full h-full bg-[#212121] overflow-hidden"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {/* Drag Overlay */}
+            {isDragOver && (
+                <div className="absolute inset-0 z-[100] bg-blue-500/20 backdrop-blur-sm flex items-center justify-center border-4 border-blue-500 border-dashed m-4 rounded-3xl">
+                    <div className="text-2xl font-bold text-white flex flex-col items-center gap-4">
+                        <PaperclipIcon />
+                        Drop files to attach
+                    </div>
+                </div>
+            )}
             
             {/* Auth Limit Modal */}
             {showAuthModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="bg-[#1a1a1a] w-full max-w-sm rounded-2xl border border-gray-700 shadow-2xl overflow-hidden p-6 text-center">
-                        <div className="flex justify-center mb-4 text-yellow-400">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                        </div>
                         <h2 className="text-xl font-bold text-white mb-2">Guest Limit Reached</h2>
-                        <p className="text-gray-400 text-sm mb-6">
-                            You have reached the free message limit for guest users. Please sign in with Google to continue chatting, sync your history, and unlock more features.
-                        </p>
-                        <div className="space-y-3">
-                            <button onClick={handleLogin} className="w-full flex items-center justify-center gap-2 bg-white text-black font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors">
-                                <UserIcon /> Sign in with Google
-                            </button>
-                            <button onClick={() => setShowAuthModal(false)} className="text-gray-500 text-xs hover:text-gray-300 underline">
-                                Close (Read-only)
-                            </button>
-                        </div>
+                        <p className="text-gray-400 text-sm mb-6">Sign in to continue chatting.</p>
+                        <button onClick={handleLogin} className="w-full flex items-center justify-center gap-2 bg-white text-black font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors">
+                            <UserIcon /> Sign in with Google
+                        </button>
+                        <button onClick={() => setShowAuthModal(false)} className="text-gray-500 text-xs hover:text-gray-300 underline mt-3">Close</button>
                     </div>
                 </div>
             )}
@@ -957,7 +1066,6 @@ const Terminal = () => {
                         </div>
                         
                         <div className="p-6 space-y-8">
-                            {/* Personality Section */}
                             <div>
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Personalization</h3>
                                 <div className="space-y-2">
@@ -980,7 +1088,6 @@ const Terminal = () => {
                                 </div>
                             </div>
 
-                            {/* Image Model Section */}
                             <div>
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Image Generation Model</h3>
                                 <div className="space-y-2">
@@ -1008,14 +1115,9 @@ const Terminal = () => {
             )}
 
             {/* Sidebar Overlay */}
-            {isSidebarOpen && (
-                <div 
-                    className="fixed inset-0 bg-black/50 z-[52] transition-opacity" 
-                    onClick={() => setIsSidebarOpen(false)}
-                />
-            )}
+            {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-[52]" onClick={() => setIsSidebarOpen(false)} />}
 
-            {/* Sidebar - UPDATED COLOR: #1a1a1a to match dark theme - Fixed Z-Index to stay above everything */}
+            {/* Sidebar */}
             <div className={`fixed inset-y-0 left-0 z-[53] w-80 bg-[#1a1a1a] border-r border-[#333] transform transition-transform duration-300 ease-in-out flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-4 flex items-center justify-between">
                      <div className="flex items-center gap-2 font-bold text-xl text-white">
@@ -1034,24 +1136,31 @@ const Terminal = () => {
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-2">
-                     {/* History Section */}
                     <div className="mb-6">
                         <h3 className="text-xs font-bold text-gray-500 mb-2 px-4 uppercase tracking-wider">History</h3>
                         {user ? (
                             <div className="space-y-1 px-2">
                                 {sessions.length > 0 ? (
                                      sessions.map(session => (
-                                         <button
-                                            key={session.id}
-                                            onClick={() => handleSelectSession(session)}
-                                            className={`w-full text-left text-sm px-3 py-2 rounded-lg truncate border-l-2 transition-colors ${
-                                                currentSessionId === session.id && showChat
-                                                ? 'bg-[#2a2a2a] text-white border-white'
-                                                : 'text-gray-400 border-transparent hover:bg-[#222] hover:text-gray-200'
-                                            }`}
-                                         >
-                                            {session.title}
-                                         </button>
+                                         <div key={session.id} className="relative group">
+                                             <button
+                                                onClick={() => handleSelectSession(session)}
+                                                className={`w-full text-left text-sm px-3 py-2 rounded-lg truncate border-l-2 transition-colors pr-8 ${
+                                                    currentSessionId === session.id && showChat
+                                                    ? 'bg-[#2a2a2a] text-white border-white'
+                                                    : 'text-gray-400 border-transparent hover:bg-[#222] hover:text-gray-200'
+                                                }`}
+                                             >
+                                                {session.title}
+                                             </button>
+                                             <button 
+                                                onClick={(e) => handleDeleteSession(e, session.id)}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                                title="Delete Chat"
+                                             >
+                                                <TrashIcon />
+                                             </button>
+                                         </div>
                                      ))
                                 ) : (
                                     <div className="text-sm text-gray-600 px-3 py-2 italic">No history yet.</div>
@@ -1063,25 +1172,16 @@ const Terminal = () => {
                     </div>
                 </div>
 
-                {/* Bottom Section: Settings & Auth */}
                 <div className="p-4 border-t border-[#333] bg-[#1a1a1a] space-y-2">
-                    
-                    {/* Settings Button */}
                      <button 
-                        onClick={() => {
-                            setIsSidebarOpen(false);
-                            setShowSettings(true);
-                        }}
+                        onClick={() => { setIsSidebarOpen(false); setShowSettings(true); }}
                         className="w-full flex items-center gap-3 text-sm text-gray-400 hover:text-white hover:bg-[#2a2a2a] px-3 py-2.5 rounded-lg transition-all"
                     >
-                        <SettingsIcon />
-                        <span>Settings</span>
+                        <SettingsIcon /> <span>Settings</span>
                     </button>
-
                      {!user ? (
                         <button onClick={handleLogin} className="w-full flex items-center justify-center gap-2 text-sm bg-[#2a2a2a] text-white px-3 py-2.5 rounded-lg font-medium hover:bg-[#333] transition-colors border border-gray-800">
-                            <UserIcon />
-                            Sign in with Google
+                            <UserIcon /> Sign in with Google
                         </button>
                     ) : (
                         <div className="flex items-center gap-3 px-2 py-1">
@@ -1097,10 +1197,10 @@ const Terminal = () => {
                 </div>
             </div>
 
-            {/* Main Content Container - Sidebar padding only on Desktop */}
+            {/* Main Content */}
             <div className={`relative w-full h-full transition-[margin-left] duration-300 ease-in-out ${isSidebarOpen && !isMobile ? 'ml-80' : 'ml-0'}`}>
                 
-                {/* Header - ABSOLUTE TOP - STRICTLY LOCKED (Z-50) */}
+                {/* Header */}
                 <header className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center p-4 pointer-events-auto bg-gradient-to-b from-[#212121] via-[#212121] to-transparent">
                      <div className="flex items-center gap-3">
                         {!isSidebarOpen && (
@@ -1108,99 +1208,62 @@ const Terminal = () => {
                                 <button onClick={() => setIsSidebarOpen(true)} className="text-gray-400 hover:text-white p-2 rounded-md hover:bg-gray-800 transition-colors">
                                     <SidebarIcon />
                                 </button>
-                                
-                                <button 
-                                    onClick={handleNewChat}
-                                    className="text-gray-400 hover:text-white p-2 rounded-md hover:bg-gray-800 transition-colors"
-                                    title="New Chat"
-                                >
+                                <button onClick={handleNewChat} className="text-gray-400 hover:text-white p-2 rounded-md hover:bg-gray-800 transition-colors" title="New Chat">
                                     <PlusIcon />
                                 </button>
                             </div>
                         )}
-
-                        {/* Logo ALWAYS visible in header now - STATIC variant to lock UI */}
                         {!isSidebarOpen && (
-                            <div 
-                                className="flex items-center gap-2 font-bold text-xl text-gray-100 cursor-pointer hover:opacity-80 transition-opacity ml-2"
-                                onClick={handleGoHome}
-                                title="Go Home"
-                            >
-                                <NexusLogo variant="simple" size="w-8 h-8" />
-                                <span>Nexus</span>
+                            <div className="flex items-center gap-2 font-bold text-xl text-gray-100 cursor-pointer hover:opacity-80 transition-opacity ml-2" onClick={handleGoHome} title="Go Home">
+                                <NexusLogo variant="simple" size="w-8 h-8" /> <span>Nexus</span>
                             </div>
                         )}
                      </div>
-
-                    {/* Right side auth status */}
                     <div className="flex items-center space-x-4">
                         {isSaving && <span className="text-xs text-gray-500 animate-pulse">Syncing...</span>}
-                        {!user && (
-                            <button onClick={handleLogin} className="text-sm text-gray-400 hover:text-white transition-colors">
-                                Sign In
-                            </button>
-                        )}
-                         {user && (
-                            <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold border border-green-400 shadow-sm cursor-default" title={user.name}>
-                                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                            </div>
-                        )}
+                        {!user && <button onClick={handleLogin} className="text-sm text-gray-400 hover:text-white transition-colors">Sign In</button>}
+                         {user && <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-bold border border-green-400 shadow-sm cursor-default" title={user.name}>{user.name ? user.name.charAt(0).toUpperCase() : 'U'}</div>}
                     </div>
                 </header>
 
-                {/* Welcome Center - ANIMATION: FADE OUT (Z-40) */}
-                {/* logic: If hasStarted is true, it fades out. Animation only applied via shouldAnimate to prevent load glitch */}
+                {/* Welcome */}
                 <div className={`absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center z-40 ${shouldAnimate ? 'transition-opacity duration-500 ease-out' : ''} ${hasStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                    <div className="mb-6">
-                        <NexusLogo variant="full" size="w-32 h-32" />
-                    </div>
+                    <div className="mb-6"><NexusLogo variant="full" size="w-32 h-32" /></div>
                     <h2 className="text-2xl font-semibold mb-2 text-white tracking-tight">How can I help you?</h2>
                 </div>
 
-                {/* Chat Area - ANIMATION: FADE IN (Z-30) */}
-                {/* Locked in position (translate-y-0), visibility controlled by opacity. */}
-                <div 
-                    className={`absolute top-0 left-0 w-full h-full pt-20 ${isMobile ? 'pb-44' : 'pb-48'} px-4 overflow-y-auto scrollbar-hide z-30 ${shouldAnimate ? 'transition-opacity duration-500 ease-in' : ''} ${
-                        showChat ? 'opacity-100' : 'opacity-0' 
-                    }`}
-                >
+                {/* Chat */}
+                <div className={`absolute top-0 left-0 w-full h-full pt-20 ${isMobile ? 'pb-44' : 'pb-48'} px-4 overflow-y-auto scrollbar-hide z-30 ${shouldAnimate ? 'transition-opacity duration-500 ease-in' : ''} ${showChat ? 'opacity-100' : 'opacity-0' }`}>
                     <div className="space-y-6 max-w-3xl mx-auto">
                         {messages.map((msg) => (
                             <div key={msg.id} className={`flex w-full ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[90%] md:max-w-[85%] rounded-2xl px-5 py-3 ${
-                                    msg.sender === 'user' 
-                                    ? 'bg-[#2f2f2f] text-gray-100 rounded-tr-sm' 
-                                    : 'bg-transparent text-gray-100'
-                                }`}>
+                                <div className={`max-w-[90%] md:max-w-[85%] rounded-2xl px-5 py-3 ${msg.sender === 'user' ? 'bg-[#2f2f2f] text-gray-100 rounded-tr-sm' : 'bg-transparent text-gray-100'}`}>
                                     {msg.sender === 'user' ? (
                                         <div>
                                             {msg.attachments?.map((a,i) => (
-                                                <div key={i} className="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                                                    <PaperclipIcon /> {a.name}
-                                                </div>
+                                                <div key={i} className="text-xs text-gray-400 mb-1 flex items-center gap-1"><PaperclipIcon /> {a.name}</div>
                                             ))}
                                             {msg.content}
                                         </div>
                                     ) : (
                                         msg.isGeneratingImage ? (
-                                            <ImageGeneratingUI />
+                                            <div className="flex justify-center py-4">
+                                                <ImageGeneratingUI />
+                                            </div>
                                         ) : (
                                             renderMarkdown(msg.content, msg.isStreaming)
                                         )
                                     )}
                                     
-                                    {/* Status Indicators */}
                                     {msg.isThinking && !msg.content && !msg.isDeepResearch && (
                                         <div className="mt-2 text-xs text-purple-400 flex items-center gap-2 animate-pulse">
-                                            <BrainIcon active={true} />
-                                            <span>Reasoning...</span>
+                                            <BrainIcon active={true} /> <span>Reasoning...</span>
                                         </div>
                                     )}
 
                                     {msg.isDeepResearch && !msg.content && (
                                         <div className="mt-2 text-xs text-teal-400 flex items-center gap-2 animate-pulse">
-                                            <LightbulbIcon active={true} />
-                                            <span>Deep Researching...</span>
+                                            <LightbulbIcon active={true} /> <span>Deep Researching...</span>
                                         </div>
                                     )}
                                     
@@ -1217,7 +1280,6 @@ const Terminal = () => {
                                 </div>
                             </div>
                         ))}
-                         {/* Loading Indicators */}
                          {(isLoading || (messages.length > 0 && messages[messages.length-1].sender === 'gemini' && !messages[messages.length-1].content && !messages[messages.length-1].isGeneratingImage && !messages[messages.length-1].isThinking && !messages[messages.length-1].isDeepResearch)) && (
                             <div className="flex justify-start w-full max-w-3xl mx-auto mt-4">
                                 <div className="ml-4 flex items-center space-x-2">
@@ -1229,150 +1291,76 @@ const Terminal = () => {
                     </div>
                 </div>
 
-                {/* Input Area - ABSOLUTE BOTTOM - STRICTLY LOCKED (Z-50) */}
-                <div className={`absolute z-50 flex justify-center pointer-events-auto ${
-                    isMobile 
-                    ? 'bottom-0 left-0 right-0 bg-[#212121] border-t border-gray-800' 
-                    : 'bottom-6 left-4 right-4'
-                }`}>
-                    <div className={`w-full max-w-3xl bg-[#2f2f2f] ${
-                        isMobile ? 'rounded-none p-3 border-none' : 'rounded-3xl p-2 shadow-2xl border border-gray-700'
-                    } relative focus-within:border-gray-500 transition-colors`}>
-                        
-                        {/* Active Voice Indicator */}
+                {/* Input */}
+                <div className={`absolute z-50 flex justify-center pointer-events-auto ${isMobile ? 'bottom-0 left-0 right-0 bg-[#212121] border-t border-gray-800' : 'bottom-6 left-4 right-4'}`}>
+                    <div className={`w-full max-w-3xl bg-[#2f2f2f] ${isMobile ? 'rounded-none p-3 border-none' : 'rounded-3xl p-2 shadow-2xl border border-gray-700'} relative focus-within:border-gray-500 transition-colors`}>
                         {isVoiceActive && (
                             <div className="absolute inset-0 bg-[#2f2f2f] z-20 rounded-3xl flex items-center justify-between px-6 border border-red-500/30">
                                 <div className="flex items-center gap-4">
-                                    <div className="relative">
-                                        <div className="absolute inset-0 bg-red-500 rounded-full voice-active-ring"></div>
-                                        <div className="relative z-10 w-3 h-3 bg-red-500 rounded-full"></div>
-                                    </div>
+                                    <div className="relative"><div className="absolute inset-0 bg-red-500 rounded-full voice-active-ring"></div><div className="relative z-10 w-3 h-3 bg-red-500 rounded-full"></div></div>
                                     <span className="text-gray-200 font-medium">Nexus Live Active</span>
                                 </div>
-                                <button onClick={stopVoiceMode} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-full text-sm transition-colors">
-                                    End Session
-                                </button>
+                                <button onClick={stopVoiceMode} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-full text-sm transition-colors">End Session</button>
                             </div>
                         )}
 
                         <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleSend();
-                                }
-                            }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
                             placeholder={isVoiceActive ? "" : isMobile ? "Message..." : "Message Nexus..."}
                             className="w-full bg-transparent text-gray-100 placeholder-gray-500 px-4 py-2 focus:outline-none resize-none max-h-[150px] min-h-[40px] text-base"
                             rows={1}
                             style={{ height: input ? 'auto' : '40px' }}
-                            onInput={(e) => {
-                                e.currentTarget.style.height = 'auto';
-                                e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px';
-                            }}
+                            onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
                         />
 
-                        {/* Attachments Preview */}
                         {attachments.length > 0 && (
                             <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
                                 {attachments.map((att, i) => (
                                     <div key={i} className="bg-gray-800 text-xs rounded-md px-2 py-1 flex items-center gap-2 border border-gray-600">
-                                        <PaperclipIcon />
-                                        <span className="truncate max-w-[100px]">{att.name}</span>
+                                        <PaperclipIcon /> <span className="truncate max-w-[100px]">{att.name}</span>
                                         <button onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-white">×</button>
                                     </div>
                                 ))}
                             </div>
                         )}
 
-                        {/* Toolbar */}
                         <div className="flex justify-between items-center px-2 pt-1 pb-1">
                             <div className="flex items-center space-x-1">
-                                
-                                {/* Model Selector (Text) */}
                                 <div className="relative mr-1 md:mr-2">
-                                    <button 
-                                        onClick={() => !useDeepResearch && setIsModelMenuOpen(!isModelMenuOpen)}
-                                        className={`flex items-center gap-1 bg-[#1e1e1e] hover:bg-[#333] border border-gray-600 px-2 md:px-3 py-1.5 rounded-full cursor-pointer transition-colors ${useDeepResearch ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    >
-                                        <ChipIcon />
-                                        {!isMobile && (
-                                            <span className="text-xs font-medium text-gray-300 max-w-[100px] truncate">
-                                                {TEXT_MODELS.find(m => m.id === modelId)?.name}
-                                            </span>
-                                        )}
-                                        <div className={`transition-transform duration-200 ${isModelMenuOpen ? 'rotate-180' : ''}`}>
-                                           <ChevronUpIcon />
-                                        </div>
+                                    <button onClick={() => !useDeepResearch && setIsModelMenuOpen(!isModelMenuOpen)} className={`flex items-center gap-1 bg-[#1e1e1e] hover:bg-[#333] border border-gray-600 px-2 md:px-3 py-1.5 rounded-full cursor-pointer transition-colors ${useDeepResearch ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                                        <ChipIcon /> {!isMobile && <span className="text-xs font-medium text-gray-300 max-w-[100px] truncate">{TEXT_MODELS.find(m => m.id === modelId)?.name}</span>}
+                                        <div className={`transition-transform duration-200 ${isModelMenuOpen ? 'rotate-180' : ''}`}><ChevronUpIcon /></div>
                                     </button>
-                                    
                                     {isModelMenuOpen && (
                                         <>
                                         <div className="fixed inset-0 z-40" onClick={() => setIsModelMenuOpen(false)} />
                                         <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 flex flex-col py-1 animate-fade-in">
                                             {TEXT_MODELS.map(m => (
-                                                <button
-                                                    key={m.id}
-                                                    onClick={() => {
-                                                        setModelId(m.id);
-                                                        setIsModelMenuOpen(false);
-                                                    }}
-                                                    className={`px-4 py-3 text-left text-sm hover:bg-[#2f2f2f] transition-colors flex items-center justify-between ${modelId === m.id ? 'text-blue-400' : 'text-gray-300'}`}
-                                                >
-                                                    <span>{m.name}</span>
-                                                    {modelId === m.id && <div className="w-2 h-2 bg-blue-400 rounded-full"></div>}
+                                                <button key={m.id} onClick={() => { setModelId(m.id); setIsModelMenuOpen(false); }} className={`px-4 py-3 text-left text-sm hover:bg-[#2f2f2f] transition-colors flex items-center justify-between ${modelId === m.id ? 'text-blue-400' : 'text-gray-300'}`}>
+                                                    <span>{m.name}</span> {modelId === m.id && <div className="w-2 h-2 bg-blue-400 rounded-full"></div>}
                                                 </button>
                                             ))}
                                         </div>
                                         </>
                                     )}
                                 </div>
-
                                 <input type="file" multiple ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                                <button onClick={() => fileInputRef.current.click()} className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-full transition-colors" title="Attach file">
-                                    <PaperclipIcon />
-                                </button>
-
-                                <button onClick={() => setUseSearch(!useSearch)} className={`p-2 rounded-full transition-colors ${useSearch ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`} title="Search Grounding">
-                                    <SearchIcon active={useSearch} />
-                                </button>
-
-                                <button onClick={() => setUseThinking(!useThinking)} className={`p-2 rounded-full transition-colors ${useThinking ? 'bg-purple-500/20 text-purple-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`} title="Stream Thinking (Reasoning)" disabled={useDeepResearch}>
-                                    <BrainIcon active={useThinking && !useDeepResearch} />
-                                </button>
-
-                                <button 
-                                    onClick={() => {
-                                        setUseDeepResearch(!useDeepResearch);
-                                        if (!useDeepResearch) {
-                                            setUseThinking(false);
-                                            setUseSearch(true);
-                                        }
-                                    }}
-                                    className={`p-2 rounded-full transition-colors ${useDeepResearch ? 'bg-teal-500/20 text-teal-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`}
-                                    title="Deep Research Mode"
-                                >
-                                    <LightbulbIcon active={useDeepResearch} />
-                                </button>
+                                <button onClick={() => fileInputRef.current.click()} className="p-2 text-gray-400 hover:text-gray-100 hover:bg-gray-700 rounded-full transition-colors" title="Attach file"><PaperclipIcon /></button>
+                                <button onClick={() => setUseSearch(!useSearch)} className={`p-2 rounded-full transition-colors ${useSearch ? 'bg-blue-500/20 text-blue-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`} title="Search Grounding"><SearchIcon active={useSearch} /></button>
+                                <button onClick={() => setUseThinking(!useThinking)} className={`p-2 rounded-full transition-colors ${useThinking ? 'bg-purple-500/20 text-purple-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`} title="Stream Thinking" disabled={useDeepResearch}><BrainIcon active={useThinking && !useDeepResearch} /></button>
+                                <button onClick={() => { setUseDeepResearch(!useDeepResearch); if (!useDeepResearch) { setUseThinking(false); setUseSearch(true); } }} className={`p-2 rounded-full transition-colors ${useDeepResearch ? 'bg-teal-500/20 text-teal-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`} title="Deep Research Mode"><LightbulbIcon active={useDeepResearch} /></button>
                             </div>
-
                             <div className="flex items-center space-x-2">
-                                 <button onClick={startVoiceMode} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors" title="Nexus Live">
-                                    <MicIcon active={false} />
-                                </button>
-                                <button 
-                                    onClick={handleSend}
-                                    disabled={isLoading || (!input.trim() && attachments.length === 0)}
-                                    className={`p-2 rounded-full transition-all duration-200 ${
-                                        input.trim() || attachments.length > 0 
-                                        ? 'bg-white text-black hover:bg-gray-200' 
-                                        : 'bg-[#3f3f3f] text-gray-500 cursor-not-allowed'
-                                    }`}
-                                >
-                                    <SendIcon />
-                                </button>
+                                 <button onClick={startVoiceMode} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors" title="Nexus Live"><MicIcon active={false} /></button>
+                                {isLoading ? (
+                                    <button onClick={handleStop} className="p-2 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-all" title="Stop Generation">
+                                        <StopIcon />
+                                    </button>
+                                ) : (
+                                    <button onClick={handleSend} disabled={!input.trim() && attachments.length === 0} className={`p-2 rounded-full transition-all duration-200 ${input.trim() || attachments.length > 0 ? 'bg-white text-black hover:bg-gray-200' : 'bg-[#3f3f3f] text-gray-500 cursor-not-allowed'}`}><SendIcon /></button>
+                                )}
                             </div>
                         </div>
                     </div>
