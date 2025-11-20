@@ -17,6 +17,10 @@ declare global {
 const GOOGLE_CLIENT_ID = '521328066665-qbsiq4imv14vh1oe189od1j5ve28rbn9.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
+// API KEY SETUP FOR CLOUDFLARE PAGES / VITE
+// In Cloudflare Pages dashboard, set environment variable: VITE_API_KEY
+const API_KEY = (import.meta as any).env?.VITE_API_KEY || process.env.API_KEY;
+
 // Nexus Model Mapping
 const TEXT_MODELS = [
     { id: 'gemini-3-pro-preview', name: 'Nexus K4 Pro' },
@@ -570,6 +574,11 @@ const Terminal = () => {
     const handleSend = async () => {
         if ((!input.trim() && attachments.length === 0) || isLoading) return;
         
+        if (!API_KEY) {
+            alert("API Key is missing. Please check your configuration.");
+            return;
+        }
+
         const currentInput = input;
         const currentAttachments = [...attachments];
         const lowerInput = currentInput.toLowerCase();
@@ -612,7 +621,7 @@ const Terminal = () => {
                 return;
             }
 
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
             
             // --- Intent Detection Logic ---
 
@@ -802,10 +811,15 @@ const Terminal = () => {
             return;
         }
 
+        if (!API_KEY) {
+            alert("API Key is missing. Please check your configuration.");
+            return;
+        }
+
         setIsVoiceActive(true);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
             const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
             const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
             audioContextRef.current = outputAudioContext;
