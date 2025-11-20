@@ -21,11 +21,12 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 // 1. In Cloudflare Pages -> Settings -> Environment Variables, add "VITE_API_KEY"
 // 2. Trigger a new deployment (Retry Deployment) so the builder can bake the key in.
 // NOTE: We use .trim() to remove accidental whitespace from copy-pasting.
-const API_KEY = (import.meta.env.VITE_API_KEY || '').trim();
+// Use optional chaining to prevent crash if environment is not injected correctly
+const API_KEY = (import.meta.env?.VITE_API_KEY || '').trim();
 
 // Nexus Model Mapping
 const TEXT_MODELS = [
-    { id: 'gemini-3-pro-preview', name: 'Nexus K4 Pro' },
+    { id: 'gemini-2.5-pro-preview', name: 'Nexus K2.5 Pro' },
     { id: 'gemini-2.5-flash', name: 'Nexus K3.5 Latest' },
     { id: 'gemini-flash-lite-latest', name: 'Nexus K3' }
 ];
@@ -78,8 +79,8 @@ const SearchIcon = ({ active }) => (
 const BrainIcon = ({ active }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? "#c084fc" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></svg>
 );
-const DeepResearchIcon = ({ active }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? "#2dd4bf" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12h10"/><path d="M9 4v16"/><path d="m3 9 3 3-3 3"/><path d="M12 6A6 6 0 0 1 6 12"/><path d="M17 12h5"/><path d="M17 12v5"/><path d="M17 12v-5"/><circle cx="17" cy="12" r="3"/></svg>
+const LightbulbIcon = ({ active }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={active ? "#facc15" : "currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-1 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.8.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
 );
 const PaperclipIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -330,6 +331,9 @@ const Terminal = () => {
     const [attachments, setAttachments] = useState<{mimeType: string, data: string, name: string}[]>([]);
     const [showSettings, setShowSettings] = useState(false);
     
+    // Auth State
+    const [showAuthModal, setShowAuthModal] = useState(false);
+    
     // Settings & Persona
     const [persona, setPersona] = useState('friendly');
     const [imageModelId, setImageModelId] = useState(IMAGE_MODELS[0].id);
@@ -411,6 +415,7 @@ const Terminal = () => {
                             localStorage.setItem('nexus_token_expiry', expiryTime.toString());
 
                             setUser({ accessToken: tokenResponse.access_token, name: "User" });
+                            setShowAuthModal(false); // Close auth modal if open
                         }
                     },
                 });
@@ -586,6 +591,16 @@ const Terminal = () => {
     const handleSend = async () => {
         if ((!input.trim() && attachments.length === 0) || isLoading) return;
         
+        // --- AUTH LIMIT CHECK ---
+        if (!user) {
+            const userMsgCount = messages.filter(m => m.sender === 'user').length;
+            // Allow 0 and 1 (2 messages total), block 3rd
+            if (userMsgCount >= 2) {
+                setShowAuthModal(true);
+                return;
+            }
+        }
+
         if (!API_KEY) {
             addMessage('system', "CRITICAL ERROR: API Key is missing. Please check your Cloudflare Environment Variables (VITE_API_KEY).");
             return;
@@ -693,7 +708,8 @@ const Terminal = () => {
             const config: any = {};
 
             if (useDeepResearch) {
-                effectiveModel = 'gemini-3-pro-preview';
+                // REPLACED: gemini-3-pro-preview -> gemini-2.5-pro-preview
+                effectiveModel = 'gemini-2.5-pro-preview';
                 config.thinkingConfig = { thinkingBudget: 8192 };
                 config.tools = [{ googleSearch: {} }];
                 effectiveSystemInstruction += "\n\n[DEEP RESEARCH MODE ACTIVE]\nYou are tasked with a DEEP RESEARCH operation. Search multiple sources, synthesize data, cross-reference facts, and provide a comprehensive, exhaustive, and well-structured report. Do not be superficial.";
@@ -903,6 +919,29 @@ const Terminal = () => {
     return (
         <div className="absolute inset-0 w-full h-full bg-[#212121] overflow-hidden">
             
+            {/* Auth Limit Modal */}
+            {showAuthModal && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-[#1a1a1a] w-full max-w-sm rounded-2xl border border-gray-700 shadow-2xl overflow-hidden p-6 text-center">
+                        <div className="flex justify-center mb-4 text-yellow-400">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
+                        <h2 className="text-xl font-bold text-white mb-2">Guest Limit Reached</h2>
+                        <p className="text-gray-400 text-sm mb-6">
+                            You have reached the free message limit for guest users. Please sign in with Google to continue chatting, sync your history, and unlock more features.
+                        </p>
+                        <div className="space-y-3">
+                            <button onClick={handleLogin} className="w-full flex items-center justify-center gap-2 bg-white text-black font-bold py-3 rounded-xl hover:bg-gray-200 transition-colors">
+                                <UserIcon /> Sign in with Google
+                            </button>
+                            <button onClick={() => setShowAuthModal(false)} className="text-gray-500 text-xs hover:text-gray-300 underline">
+                                Close (Read-only)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Settings Modal */}
             {showSettings && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -1159,7 +1198,7 @@ const Terminal = () => {
 
                                     {msg.isDeepResearch && !msg.content && (
                                         <div className="mt-2 text-xs text-teal-400 flex items-center gap-2 animate-pulse">
-                                            <DeepResearchIcon active={true} />
+                                            <LightbulbIcon active={true} />
                                             <span>Deep Researching...</span>
                                         </div>
                                     )}
@@ -1314,7 +1353,7 @@ const Terminal = () => {
                                     className={`p-2 rounded-full transition-colors ${useDeepResearch ? 'bg-teal-500/20 text-teal-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`}
                                     title="Deep Research Mode"
                                 >
-                                    <DeepResearchIcon active={useDeepResearch} />
+                                    <LightbulbIcon active={useDeepResearch} />
                                 </button>
                             </div>
 
