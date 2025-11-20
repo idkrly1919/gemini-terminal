@@ -22,7 +22,6 @@ const API_KEY = ((import.meta as any).env?.VITE_API_KEY || '').replace(/["']/g, 
 
 // Nexus Model Mapping
 const TEXT_MODELS = [
-    { id: 'gemini-3-pro-preview', name: 'Nexus K4 Pro' },
     { id: 'gemini-2.5-flash', name: 'Nexus K3.5 Latest' },
     { id: 'gemini-flash-lite-latest', name: 'Nexus K3' }
 ];
@@ -65,8 +64,6 @@ const IMAGE_MODELS = [
     { id: 'gemini-2.5-flash-image', name: 'Nexus Imageneer' }
 ];
 
-const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
-
 // --- Icons ---
 
 const SearchIcon = ({ active }) => (
@@ -81,8 +78,8 @@ const LightbulbIcon = ({ active }) => (
 const PaperclipIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
 );
-const MicIcon = ({ active }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+const SpeakerIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /></svg>
 );
 const SendIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -117,23 +114,22 @@ const CloseIcon = () => (
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
 );
-const DownloadIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-);
 
 // --- Audio Helpers ---
 
-function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): AudioBuffer {
-    const dataInt16 = new Int16Array(data.buffer);
-    const frameCount = dataInt16.length / numChannels;
-    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
-    for (let channel = 0; channel < numChannels; channel++) {
-        const channelData = buffer.getChannelData(channel);
-        for (let i = 0; i < frameCount; i++) {
-            channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
+    return new Promise((resolve) => {
+        const dataInt16 = new Int16Array(data.buffer);
+        const frameCount = dataInt16.length / numChannels;
+        const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+        for (let channel = 0; channel < numChannels; channel++) {
+            const channelData = buffer.getChannelData(channel);
+            for (let i = 0; i < frameCount; i++) {
+                channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+            }
         }
-    }
-    return buffer;
+        resolve(buffer);
+    });
 }
 
 function decodeBase64(base64: string) {
@@ -144,27 +140,6 @@ function decodeBase64(base64: string) {
         bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes;
-}
-
-function encodePCM(bytes: Uint8Array) {
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-}
-
-function createBlob(data: Float32Array) {
-    const l = data.length;
-    const int16 = new Int16Array(l);
-    for (let i = 0; i < l; i++) {
-        int16[i] = data[i] * 32768;
-    }
-    return {
-        data: encodePCM(new Uint8Array(int16.buffer)),
-        mimeType: 'audio/pcm;rate=16000',
-    };
 }
 
 // --- Components ---
@@ -194,31 +169,25 @@ const LogoSVG = () => (
             </filter>
         </defs>
         
-        {/* 3D Layer effects - Simulated by rendering offset shapes first */}
         <g transform="translate(1, 2)">
              <path d="M 15 15 H 60 L 40 45 H 15 V 15 Z" fill="rgba(0,0,0,0.5)" />
              <path d="M 40 45 L 20 85 H 45 L 65 45 H 40 Z" fill="rgba(0,0,0,0.5)" />
              <path d="M 65 15 L 85 15 L 65 85 L 45 85 Z" fill="rgba(0,0,0,0.5)" />
         </g>
 
-        {/* The Blue "7" shape - Main Body */}
         <path d="M 15 15 H 60 L 40 45 H 15 V 15 Z" fill="url(#nexusBlue)" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
         <path d="M 40 45 L 20 85 H 45 L 65 45 H 40 Z" fill="url(#nexusBlue)" stroke="rgba(255,255,255,0.3)" strokeWidth="0.5" />
         
-        {/* Side shading for 3D depth */}
         <path d="M 60 15 L 40 45 L 40 45" fill="url(#nexusBlueDark)" opacity="0.6" />
         
-        {/* The Silver diagonal slash */}
         <path d="M 65 15 L 85 15 L 65 85 L 45 85 Z" fill="url(#nexusSilver)" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" filter="url(#glow)" />
         
-        {/* Shine highlight */}
         <path d="M 65 15 L 70 15 L 50 85 L 45 85 Z" fill="white" opacity="0.2" />
     </svg>
 );
 
 const NexusLogo = ({ size = "w-10 h-10", variant = "full" }: { size?: string, variant?: "full" | "simple" }) => {
     if (variant === "simple") {
-        // Simple variant is completely static - no gyro, no floats.
         return (
             <div className={`${size} relative`}>
                 <LogoSVG />
@@ -250,41 +219,38 @@ const LoadingOrb = ({ mode = 'normal' }: { mode?: 'normal' | 'deep' }) => (
 );
 
 const ImageGeneratingUI = () => (
-    <div className="relative w-full max-w-[300px] bg-[#2f2f2f] rounded-xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-6 aspect-[3/4]">
-        {/* Shimmer effect */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-full animate-[shimmer_2s_infinite]"></div>
+    <div className="relative w-full max-w-[400px] bg-[#2f2f2f] rounded-3xl border border-gray-700/50 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-10 aspect-square mx-auto">
+        {/* Title */}
+        <div className="text-lg font-medium text-gray-200 mb-8">Generating Image...</div>
         
-        {/* Title - Handwritten style */}
-        <div className="text-2xl font-light text-gray-300 mb-8 tracking-wide" style={{ fontFamily: 'cursive' }}>generating</div>
-        
-        {/* Circle & Mountains sketch */}
-        <div className="relative w-32 h-32 mb-8 opacity-80">
-             {/* Sun/Moon */}
-            <div className="absolute top-0 left-2 w-12 h-12 border-2 border-gray-400 rounded-full"></div>
-            
-            {/* Mountains */}
-            <div className="absolute bottom-0 left-0 w-full h-20 flex items-end justify-center">
-                <svg viewBox="0 0 100 60" className="w-full h-full stroke-gray-400 fill-none stroke-2">
-                    <path d="M10 60 L35 10 L60 60" />
-                    <path d="M40 60 L65 20 L90 60" />
-                </svg>
-            </div>
+        {/* Icon: Sun & Mountains */}
+        <div className="relative w-32 h-32 mb-8 text-gray-400 opacity-80">
+             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
+                <path d="M12 6a3 3 0 100-6 3 3 0 000 6zM2 18l6-8 3 4 1-1.5 6 9H4l-2-3.5z" fillOpacity="0.3" />
+                <path d="M13.5 9L8 16.5l-3-4L0 19h18l-4.5-10z" />
+                <path d="M18.5 12l-3.5 5 1.5 2h7l-5-7z" fillOpacity="0.6" />
+             </svg>
         </div>
 
-        {/* Text */}
-        <div className="text-xl font-light text-gray-400 tracking-widest mb-6">image...</div>
-
-        {/* Progress Bar */}
-        <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
-            <div className="h-full bg-gray-300 rounded-full animate-[progress-fill_4s_ease-in-out_infinite]"></div>
+        {/* Progress Bar Container */}
+        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden shadow-inner mb-2 relative">
+             {/* Animated Fill */}
+            <div className="h-full bg-gray-500 rounded-full w-[60%] animate-[progress-fill_3s_ease-in-out_infinite]"></div>
         </div>
+        
+        {/* Percentage */}
+        <div className="w-full flex justify-end">
+             <span className="text-xs text-gray-400">60%</span>
+        </div>
+
+        {/* Footer Text */}
+        <div className="text-sm text-gray-500 mt-4">Please wait...</div>
     </div>
 );
 
 // --- Hooks ---
 
 function useIsMobile() {
-    // Initialize state based on window width to avoid layout shift on load
     const [isMobile, setIsMobile] = useState(() => {
         if (typeof window !== 'undefined') {
             return window.innerWidth < 768;
@@ -306,8 +272,7 @@ interface Message {
     id: string;
     role: 'user' | 'model';
     content: string;
-    // ... optional fields
-    sender: 'user' | 'gemini' | 'system'; // Mapping role for UI
+    sender: 'user' | 'gemini' | 'system';
     timestamp: number;
     attachments?: any[];
     isGeneratingImage?: boolean;
@@ -343,7 +308,7 @@ const Terminal = () => {
     const [isDragOver, setIsDragOver] = useState(false);
     
     // Config State
-    const [modelId, setModelId] = useState('gemini-3-pro-preview');
+    const [modelId, setModelId] = useState('gemini-2.5-flash');
     const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
     const [useSearch, setUseSearch] = useState(true);
     const [useThinking, setUseThinking] = useState(false);
@@ -358,9 +323,6 @@ const Terminal = () => {
     const [persona, setPersona] = useState('friendly');
     const [imageModelId, setImageModelId] = useState(IMAGE_MODELS[0].id);
 
-    // Live API State
-    const [isVoiceActive, setIsVoiceActive] = useState(false);
-    
     // Auth & Drive State
     const [user, setUser] = useState<any>(null);
     const [tokenClient, setTokenClient] = useState<any>(null);
@@ -373,9 +335,6 @@ const Terminal = () => {
     // Refs
     const chatEndRef = useRef(null);
     const fileInputRef = useRef(null);
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const liveSessionRef = useRef<any>(null);
-    const nextStartTimeRef = useRef(0);
     const saveTimeoutRef = useRef<any>(null);
 
     // Copy Button Logic
@@ -400,20 +359,9 @@ const Terminal = () => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
 
-    // Debug API Key presence on mount
-    useEffect(() => {
-        const keyStatus = API_KEY ? `Present (Length: ${API_KEY.length})` : "MISSING";
-        console.log(`[DEBUG] API Key Status: ${keyStatus}`);
-        
-        if (!API_KEY) {
-             console.error("[CRITICAL] VITE_API_KEY is missing in environment variables. Please check Cloudflare Pages Settings > Environment Variables.");
-        }
-    }, []);
-
     // --- Google Drive Integration & Persistence ---
 
     useEffect(() => {
-        // 1. Load GAPI Script
         const gapiScript = document.createElement('script');
         gapiScript.src = "https://apis.google.com/js/api.js";
         gapiScript.onload = () => {
@@ -430,16 +378,13 @@ const Terminal = () => {
         };
         document.body.appendChild(gapiScript);
 
-        // 2. Restore Session from LocalStorage
         const storedToken = localStorage.getItem('nexus_google_token');
-        
         if (storedToken) {
             setUser({ accessToken: storedToken, name: "User" });
         }
     }, []);
 
     useEffect(() => {
-        // 3. Initialize Google Identity Services (GIS)
         const initGis = () => {
             if (window.google && window.google.accounts) {
                 const client = window.google.accounts.oauth2.initTokenClient({
@@ -447,14 +392,9 @@ const Terminal = () => {
                     scope: SCOPES,
                     callback: (tokenResponse) => {
                         if (tokenResponse && tokenResponse.access_token) {
-                            // Persist Token
-                            const expiresIn = tokenResponse.expires_in || 3600;
-                            const expiryTime = Date.now() + expiresIn * 1000;
                             localStorage.setItem('nexus_google_token', tokenResponse.access_token);
-                            localStorage.setItem('nexus_token_expiry', expiryTime.toString());
-
                             setUser({ accessToken: tokenResponse.access_token, name: "User" });
-                            setShowAuthModal(false); // Close auth modal if open
+                            setShowAuthModal(false);
                         }
                     },
                 });
@@ -466,7 +406,6 @@ const Terminal = () => {
         initGis();
     }, []);
 
-    // 4. Trigger Sync when User and GAPI are ready
     useEffect(() => {
         if (user && isGapiReady && !hasLoadedFromDrive.current) {
             hasLoadedFromDrive.current = true;
@@ -485,12 +424,10 @@ const Terminal = () => {
     const loadSessionsFromDrive = async (accessToken) => {
         try {
             window.gapi.client.setToken({ access_token: accessToken });
-            
             const response = await window.gapi.client.drive.files.list({
                 q: "name = 'nexus_chat_history.json' and trashed = false",
                 fields: "files(id, name)",
             });
-            
             const files = response.result.files;
             if (files && files.length > 0) {
                 const fileId = files[0].id;
@@ -499,12 +436,8 @@ const Terminal = () => {
                     fileId: fileId,
                     alt: 'media'
                 });
-                
                 let loadedData = contentResponse.result;
-                
-                // Data Migration: Handle legacy single-chat format
                 if (Array.isArray(loadedData) && loadedData.length > 0 && !loadedData[0].messages) {
-                    console.log("Migrating legacy chat history to sessions format...");
                     const legacySession: ChatSession = {
                         id: uuidv4(),
                         title: "Legacy Chat",
@@ -515,9 +448,6 @@ const Terminal = () => {
                 } else if (Array.isArray(loadedData)) {
                     setSessions(loadedData);
                 }
-
-                // IMPORTANT: We do NOT load messages into view automatically.
-                // We stay on the welcome screen so the user can choose.
                 setMessages([]); 
                 setHasStarted(false);
                 setShowChat(false);
@@ -526,19 +456,15 @@ const Terminal = () => {
             console.error("Error loading from Drive", e);
             if (e.status === 401) {
                 localStorage.removeItem('nexus_google_token');
-                localStorage.removeItem('nexus_token_expiry');
                 setUser(null);
             }
         }
     };
 
-    // Update Sessions when Messages Change
     useEffect(() => {
         if (messages.length > 0) {
             setSessions(prevSessions => {
                 const existingSessionIndex = prevSessions.findIndex(s => s.id === currentSessionId);
-                
-                // Create a title from the first user message if possible
                 const firstUserMsg = messages.find(m => m.sender === 'user');
                 const title = firstUserMsg ? (firstUserMsg.content.slice(0, 30) + (firstUserMsg.content.length > 30 ? '...' : '')) : "New Chat";
 
@@ -552,7 +478,6 @@ const Terminal = () => {
                 if (existingSessionIndex >= 0) {
                     const newSessions = [...prevSessions];
                     newSessions[existingSessionIndex] = updatedSession;
-                    // Move to top
                     newSessions.sort((a, b) => b.timestamp - a.timestamp);
                     return newSessions;
                 } else {
@@ -562,35 +487,26 @@ const Terminal = () => {
         }
     }, [messages, currentSessionId]);
 
-    // Auto-save Effect for Sessions
     useEffect(() => {
         if (!user || sessions.length === 0) return;
-
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
         saveTimeoutRef.current = setTimeout(async () => {
             setIsSaving(true);
             try {
                 const fileContent = JSON.stringify(sessions, null, 2);
-                const fileMetadata = {
-                    name: 'nexus_chat_history.json',
-                    mimeType: 'application/json'
-                };
+                const fileMetadata = { name: 'nexus_chat_history.json', mimeType: 'application/json' };
 
                 if (driveFileId) {
                     await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
                         method: 'PATCH',
-                        headers: {
-                            Authorization: `Bearer ${user.accessToken}`,
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { Authorization: `Bearer ${user.accessToken}`, 'Content-Type': 'application/json' },
                         body: fileContent
                     });
                 } else {
                      const form = new FormData();
                      form.append('metadata', new Blob([JSON.stringify(fileMetadata)], { type: 'application/json' }));
                      form.append('file', new Blob([fileContent], { type: 'application/json' }));
-
                      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                          method: 'POST',
                          headers: { Authorization: `Bearer ${user.accessToken}` },
@@ -605,22 +521,47 @@ const Terminal = () => {
                 setIsSaving(false);
             }
         }, 2000);
-
         return () => clearTimeout(saveTimeoutRef.current);
     }, [sessions, user, driveFileId]);
 
+    // --- TTS Logic ---
+    const handleTTS = async (text: string) => {
+        if (!API_KEY) return;
+        try {
+            const ai = new GoogleGenAI({ apiKey: API_KEY });
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash-preview-tts',
+                contents: { parts: [{ text }] },
+                config: {
+                    responseModalities: [Modality.AUDIO],
+                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
+                },
+            });
+            
+            const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+                const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), audioContext, 24000, 1);
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                source.start();
+            }
+        } catch (e) {
+            console.error("TTS Error", e);
+        }
+    };
 
     // --- Chat Logic ---
 
     const handleSelectSession = (session: ChatSession) => {
-        if (session.id === currentSessionId && showChat) return; // Already active
-        
+        if (session.id === currentSessionId && showChat) return;
         setMessages(session.messages);
         setCurrentSessionId(session.id);
         setHasStarted(true);
         setShowChat(true);
-        setShouldAnimate(true); // Ensure animation plays if coming from welcome screen
-        setIsSidebarOpen(false); // Close sidebar on mobile
+        setShouldAnimate(true);
+        setIsSidebarOpen(false);
     };
 
     const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
@@ -641,7 +582,6 @@ const Terminal = () => {
             abortControllerRef.current.abort();
             abortControllerRef.current = null;
             setIsLoading(false);
-            // Remove streaming flag from last message
             setMessages(prev => {
                 const last = prev[prev.length - 1];
                 if (last && last.isStreaming) {
@@ -692,7 +632,6 @@ const Terminal = () => {
         setMessages(prev => [...prev, newMessage]);
         setIsLoading(true);
         
-        // Initialize AbortController
         abortControllerRef.current = new AbortController();
 
         try {
@@ -712,7 +651,6 @@ const Terminal = () => {
 
             const ai = new GoogleGenAI({ apiKey: API_KEY });
             
-            // Image Gen Logic
             const isImageGen = /(generate|create|draw|make).*(image|picture|photo|drawing)/i.test(lowerInput);
             const isImageEdit = /(edit|change|modify|fix|add|remove)/i.test(lowerInput) && currentAttachments.length > 0;
             
@@ -762,13 +700,12 @@ const Terminal = () => {
                 return;
             }
 
-            // Text Chat
             let effectiveSystemInstruction = PERSONALITIES[persona].instruction;
             let effectiveModel = modelId;
             const config: any = {};
 
             if (useDeepResearch) {
-                effectiveModel = 'gemini-2.5-flash'; // Using Flash for quota safety
+                effectiveModel = 'gemini-2.5-flash'; 
                 config.thinkingConfig = { thinkingBudget: 8192 };
                 config.tools = [{ googleSearch: {} }];
                 effectiveSystemInstruction += "\n\n[DEEP RESEARCH MODE ACTIVE]\nYou are tasked with a DEEP RESEARCH operation.";
@@ -816,9 +753,7 @@ const Terminal = () => {
             let accumulatedText = '';
             
             for await (const chunk of responseStream) {
-                // Check for abort
                 if (!abortControllerRef.current) break;
-
                 const textChunk = chunk.text || '';
                 accumulatedText += textChunk;
                 const grounding = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
@@ -841,17 +776,38 @@ const Terminal = () => {
             ));
 
         } catch (err) {
-            if (err.name === 'AbortError') return; // Ignore user abort
-            let errorMessage = `Nexus System Error: ${err.message}`;
-            if (err.message && err.message.includes('Failed to fetch')) errorMessage += " (Check API Key Restrictions)";
-            setMessages(prev => [...prev, { id: uuidv4(), sender: 'system', content: errorMessage, timestamp: Date.now() } as Message]);
+            if (err.name === 'AbortError') return;
+            
+            let errorMessage = "Nexus System Error";
+            let errorDetails = err.message || "An unknown error occurred.";
+
+            try {
+                const jsonMatch = err.message.match(/\{.*\}/s);
+                if (jsonMatch) {
+                    const errorObj = JSON.parse(jsonMatch[0]);
+                    if (errorObj.error) {
+                        if (errorObj.error.code === 429 || errorObj.error.status === 'RESOURCE_EXHAUSTED') {
+                            errorMessage = "⚠️ System Overload (Quota Exceeded)";
+                            errorDetails = "You have reached the free tier generation limit for this model. Please try again in a few minutes or switch models.";
+                        } else {
+                             errorMessage = `System Error (${errorObj.error.code})`;
+                             errorDetails = errorObj.error.message;
+                        }
+                    }
+                }
+            } catch (e) {
+                // Failed to parse
+            }
+
+            const errorContent = `**${errorMessage}**\n\n${errorDetails}`;
+            
+            setMessages(prev => [...prev, { id: uuidv4(), sender: 'system', content: errorContent, timestamp: Date.now() } as Message]);
         } finally {
             setIsLoading(false);
             abortControllerRef.current = null;
         }
     };
 
-    // Drag & Drop
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault();
         setIsDragOver(true);
@@ -905,88 +861,7 @@ const Terminal = () => {
         setIsSidebarOpen(false);
     }
 
-    // --- Live API Logic ---
-
-    const stopVoiceMode = () => {
-        if (liveSessionRef.current) {
-            try { liveSessionRef.current.close(); } catch(e) {}
-            liveSessionRef.current = null;
-        }
-        if (audioContextRef.current) {
-            audioContextRef.current.close();
-            audioContextRef.current = null;
-        }
-        setIsVoiceActive(false);
-    };
-
-    const startVoiceMode = async () => {
-        if (isVoiceActive) {
-            stopVoiceMode();
-            return;
-        }
-        if (!API_KEY) {
-            alert("API Key missing");
-            return;
-        }
-
-        setIsVoiceActive(true);
-
-        try {
-            const ai = new GoogleGenAI({ apiKey: API_KEY });
-            const inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-            const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-            audioContextRef.current = outputAudioContext;
-            nextStartTimeRef.current = 0;
-
-            const outputNode = outputAudioContext.createGain();
-            outputNode.connect(outputAudioContext.destination);
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            const sessionPromise = ai.live.connect({
-                model: LIVE_MODEL,
-                callbacks: {
-                    onopen: () => {
-                        const source = inputAudioContext.createMediaStreamSource(stream);
-                        const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
-                        scriptProcessor.onaudioprocess = (e) => {
-                            const inputData = e.inputBuffer.getChannelData(0);
-                            const pcmBlob = createBlob(inputData);
-                            sessionPromise.then(session => session.sendRealtimeInput({ media: pcmBlob }));
-                        };
-                        source.connect(scriptProcessor);
-                        scriptProcessor.connect(inputAudioContext.destination);
-                    },
-                    onmessage: async (msg: LiveServerMessage) => {
-                        const base64Audio = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-                        if (base64Audio) {
-                            nextStartTimeRef.current = Math.max(nextStartTimeRef.current, outputAudioContext.currentTime);
-                            const audioBuffer = decodeAudioData(decodeBase64(base64Audio), outputAudioContext, 24000, 1);
-                            const source = outputAudioContext.createBufferSource();
-                            source.buffer = audioBuffer;
-                            source.connect(outputNode);
-                            source.start(nextStartTimeRef.current);
-                            nextStartTimeRef.current += audioBuffer.duration;
-                        }
-                    },
-                    onclose: () => stopVoiceMode(),
-                    onerror: () => stopVoiceMode()
-                },
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } } },
-                    systemInstruction: PERSONALITIES[persona].instruction
-                }
-            });
-            liveSessionRef.current = await sessionPromise;
-        } catch (error) {
-            console.error(error);
-            setIsVoiceActive(false);
-        }
-    };
-
-    // --- Markdown Renderer with Copy Button ---
     const renderMarkdown = (content, isStreaming = false) => {
-        // Configure marked with custom renderer for code blocks
         const renderer = new marked.Renderer();
         renderer.code = ({ text, lang }) => {
             const language = lang || 'plaintext';
@@ -1005,7 +880,6 @@ const Terminal = () => {
             </div>`;
         };
         
-        // Image Download Overlay
         renderer.image = ({ href, title, text }) => {
             return `
             <div class="relative group inline-block rounded-lg overflow-hidden my-2">
@@ -1018,7 +892,21 @@ const Terminal = () => {
 
         const textToRender = isStreaming ? content + " ▋" : content;
         const raw = marked(textToRender, { renderer });
-        return <div className="prose prose-invert prose-p:text-gray-300 prose-headings:text-gray-100 max-w-none" dangerouslySetInnerHTML={{ __html: raw }} />;
+        
+        return (
+            <div className="relative group">
+                <div className="prose prose-invert prose-p:text-gray-300 prose-headings:text-gray-100 max-w-none" dangerouslySetInnerHTML={{ __html: raw }} />
+                {!isStreaming && (
+                    <button 
+                        onClick={() => handleTTS(content.replace(/[*#`_]/g, ''))} 
+                        className="absolute -bottom-6 left-0 text-gray-500 hover:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity p-1" 
+                        title="Read Aloud"
+                    >
+                        <SpeakerIcon />
+                    </button>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -1028,7 +916,6 @@ const Terminal = () => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
-            {/* Drag Overlay */}
             {isDragOver && (
                 <div className="absolute inset-0 z-[100] bg-blue-500/20 backdrop-blur-sm flex items-center justify-center border-4 border-blue-500 border-dashed m-4 rounded-3xl">
                     <div className="text-2xl font-bold text-white flex flex-col items-center gap-4">
@@ -1038,7 +925,6 @@ const Terminal = () => {
                 </div>
             )}
             
-            {/* Auth Limit Modal */}
             {showAuthModal && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
                     <div className="bg-[#1a1a1a] w-full max-w-sm rounded-2xl border border-gray-700 shadow-2xl overflow-hidden p-6 text-center">
@@ -1052,7 +938,6 @@ const Terminal = () => {
                 </div>
             )}
 
-            {/* Settings Modal */}
             {showSettings && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-[#1a1a1a] w-full max-w-lg rounded-2xl border border-gray-800 shadow-2xl overflow-hidden animate-fade-in">
@@ -1114,10 +999,8 @@ const Terminal = () => {
                 </div>
             )}
 
-            {/* Sidebar Overlay */}
             {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-[52]" onClick={() => setIsSidebarOpen(false)} />}
 
-            {/* Sidebar */}
             <div className={`fixed inset-y-0 left-0 z-[53] w-80 bg-[#1a1a1a] border-r border-[#333] transform transition-transform duration-300 ease-in-out flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-4 flex items-center justify-between">
                      <div className="flex items-center gap-2 font-bold text-xl text-white">
@@ -1197,10 +1080,8 @@ const Terminal = () => {
                 </div>
             </div>
 
-            {/* Main Content */}
             <div className={`relative w-full h-full transition-[margin-left] duration-300 ease-in-out ${isSidebarOpen && !isMobile ? 'ml-80' : 'ml-0'}`}>
                 
-                {/* Header */}
                 <header className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center p-4 pointer-events-auto bg-gradient-to-b from-[#212121] via-[#212121] to-transparent">
                      <div className="flex items-center gap-3">
                         {!isSidebarOpen && (
@@ -1226,13 +1107,11 @@ const Terminal = () => {
                     </div>
                 </header>
 
-                {/* Welcome */}
                 <div className={`absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center z-40 ${shouldAnimate ? 'transition-opacity duration-500 ease-out' : ''} ${hasStarted ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="mb-6"><NexusLogo variant="full" size="w-32 h-32" /></div>
                     <h2 className="text-2xl font-semibold mb-2 text-white tracking-tight">How can I help you?</h2>
                 </div>
 
-                {/* Chat */}
                 <div className={`absolute top-0 left-0 w-full h-full pt-20 ${isMobile ? 'pb-44' : 'pb-48'} px-4 overflow-y-auto scrollbar-hide z-30 ${shouldAnimate ? 'transition-opacity duration-500 ease-in' : ''} ${showChat ? 'opacity-100' : 'opacity-0' }`}>
                     <div className="space-y-6 max-w-3xl mx-auto">
                         {messages.map((msg) => (
@@ -1291,24 +1170,13 @@ const Terminal = () => {
                     </div>
                 </div>
 
-                {/* Input */}
                 <div className={`absolute z-50 flex justify-center pointer-events-auto ${isMobile ? 'bottom-0 left-0 right-0 bg-[#212121] border-t border-gray-800' : 'bottom-6 left-4 right-4'}`}>
                     <div className={`w-full max-w-3xl bg-[#2f2f2f] ${isMobile ? 'rounded-none p-3 border-none' : 'rounded-3xl p-2 shadow-2xl border border-gray-700'} relative focus-within:border-gray-500 transition-colors`}>
-                        {isVoiceActive && (
-                            <div className="absolute inset-0 bg-[#2f2f2f] z-20 rounded-3xl flex items-center justify-between px-6 border border-red-500/30">
-                                <div className="flex items-center gap-4">
-                                    <div className="relative"><div className="absolute inset-0 bg-red-500 rounded-full voice-active-ring"></div><div className="relative z-10 w-3 h-3 bg-red-500 rounded-full"></div></div>
-                                    <span className="text-gray-200 font-medium">Nexus Live Active</span>
-                                </div>
-                                <button onClick={stopVoiceMode} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-full text-sm transition-colors">End Session</button>
-                            </div>
-                        )}
-
                         <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-                            placeholder={isVoiceActive ? "" : isMobile ? "Message..." : "Message Nexus..."}
+                            placeholder={isMobile ? "Message..." : "Message Nexus..."}
                             className="w-full bg-transparent text-gray-100 placeholder-gray-500 px-4 py-2 focus:outline-none resize-none max-h-[150px] min-h-[40px] text-base"
                             rows={1}
                             style={{ height: input ? 'auto' : '40px' }}
@@ -1353,7 +1221,6 @@ const Terminal = () => {
                                 <button onClick={() => { setUseDeepResearch(!useDeepResearch); if (!useDeepResearch) { setUseThinking(false); setUseSearch(true); } }} className={`p-2 rounded-full transition-colors ${useDeepResearch ? 'bg-teal-500/20 text-teal-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`} title="Deep Research Mode"><LightbulbIcon active={useDeepResearch} /></button>
                             </div>
                             <div className="flex items-center space-x-2">
-                                 <button onClick={startVoiceMode} className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors" title="Nexus Live"><MicIcon active={false} /></button>
                                 {isLoading ? (
                                     <button onClick={handleStop} className="p-2 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-all" title="Stop Generation">
                                         <StopIcon />
