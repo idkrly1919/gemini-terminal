@@ -18,8 +18,9 @@ const GOOGLE_CLIENT_ID = '521328066665-qbsiq4imv14vh1oe189od1j5ve28rbn9.apps.goo
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 // API KEY SETUP FOR CLOUDFLARE PAGES / VITE
-// In Cloudflare Pages dashboard, set environment variable: VITE_API_KEY
-const API_KEY = (import.meta as any).env?.VITE_API_KEY || process.env.API_KEY;
+// 1. In Cloudflare Pages -> Settings -> Environment Variables, add "VITE_API_KEY"
+// 2. Trigger a new deployment (Retry Deployment) so the builder can bake the key in.
+const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 // Nexus Model Mapping
 const TEXT_MODELS = [
@@ -355,6 +356,11 @@ const Terminal = () => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
 
+    // Debug API Key presence on mount
+    useEffect(() => {
+        console.log("API Key Configured:", API_KEY ? "YES" : "NO (Check VITE_API_KEY in Cloudflare Settings)");
+    }, []);
+
     // --- Google Drive Integration & Persistence ---
 
     useEffect(() => {
@@ -575,7 +581,7 @@ const Terminal = () => {
         if ((!input.trim() && attachments.length === 0) || isLoading) return;
         
         if (!API_KEY) {
-            alert("API Key is missing. Please check your configuration.");
+            alert("API Key is missing or invalid. Please check your Cloudflare environment variables.");
             return;
         }
 
