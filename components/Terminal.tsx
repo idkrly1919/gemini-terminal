@@ -20,7 +20,8 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 // API KEY SETUP FOR CLOUDFLARE PAGES / VITE
 // 1. In Cloudflare Pages -> Settings -> Environment Variables, add "VITE_API_KEY"
 // 2. Trigger a new deployment (Retry Deployment) so the builder can bake the key in.
-const API_KEY = import.meta.env.VITE_API_KEY || '';
+// NOTE: We use .trim() to remove accidental whitespace from copy-pasting.
+const API_KEY = (import.meta.env.VITE_API_KEY || '').trim();
 
 // Nexus Model Mapping
 const TEXT_MODELS = [
@@ -771,7 +772,7 @@ const Terminal = () => {
             if (err.message && err.message.includes('Failed to fetch')) {
                  errorMessage += "\n\n**POSSIBLE CAUSES:**\n1. **Google Cloud Restrictions:** Your API Key might be restricted to specific domains. Go to Google Cloud Console > Credentials > API Key > Website Restrictions and add `https://*.pages.dev/*`.\n2. **Ad Blockers:** uBlock Origin can block Google API calls. Try disabling it for this site.\n3. **Invalid API Key:** The key stored in Cloudflare might be incorrect.";
             } else if (err.message && err.message.includes('400')) {
-                 errorMessage += "\n\n**API Key Invalid:** The API key provided is rejected by Google. Check your Cloudflare Environment Variables.";
+                 errorMessage += "\n\n**API Key Invalid:** The API key provided is rejected by Google. Check that you copied it correctly in Cloudflare without spaces.";
             }
 
             addMessage('system', errorMessage);
