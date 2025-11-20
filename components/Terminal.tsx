@@ -8,6 +8,8 @@ declare global {
     interface Window {
         google: any;
         gapi: any;
+        webkitSpeechRecognition: any;
+        SpeechRecognition: any;
     }
 }
 
@@ -114,6 +116,12 @@ const CloseIcon = () => (
 const TrashIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
 );
+const DownloadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+);
+const MicIcon = ({ active }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+);
 
 // --- Audio Helpers ---
 
@@ -218,35 +226,37 @@ const LoadingOrb = ({ mode = 'normal' }: { mode?: 'normal' | 'deep' }) => (
     </div>
 );
 
-const ImageGeneratingUI = () => (
-    <div className="relative w-full max-w-[400px] bg-[#2f2f2f] rounded-3xl border border-gray-700/50 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-10 aspect-square mx-auto">
-        {/* Title */}
-        <div className="text-lg font-medium text-gray-200 mb-8">Generating Image...</div>
-        
-        {/* Icon: Sun & Mountains */}
-        <div className="relative w-32 h-32 mb-8 text-gray-400 opacity-80">
-             <svg viewBox="0 0 24 24" fill="currentColor" className="w-full h-full">
-                <path d="M12 6a3 3 0 100-6 3 3 0 000 6zM2 18l6-8 3 4 1-1.5 6 9H4l-2-3.5z" fillOpacity="0.3" />
-                <path d="M13.5 9L8 16.5l-3-4L0 19h18l-4.5-10z" />
-                <path d="M18.5 12l-3.5 5 1.5 2h7l-5-7z" fillOpacity="0.6" />
-             </svg>
-        </div>
+const ImageGeneratingUI = () => {
+    const [timeLeft, setTimeLeft] = useState(0);
+    
+    useEffect(() => {
+        setTimeLeft(Math.floor(Math.random() * (10 - 5 + 1) + 5));
+    }, []);
 
-        {/* Progress Bar Container */}
-        <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden shadow-inner mb-2 relative">
-             {/* Animated Fill */}
-            <div className="h-full bg-gray-500 rounded-full w-[60%] animate-[progress-fill_3s_ease-in-out_infinite]"></div>
-        </div>
-        
-        {/* Percentage */}
-        <div className="w-full flex justify-end">
-             <span className="text-xs text-gray-400">60%</span>
-        </div>
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTimeLeft(prev => prev > 0 ? prev - 1 : 0);
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
 
-        {/* Footer Text */}
-        <div className="text-sm text-gray-500 mt-4">Please wait...</div>
-    </div>
-);
+    return (
+        <div className="relative w-72 h-36 bg-[#2f2f2f] rounded-xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-5 mx-auto">
+            <div className="text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                 <span className="animate-pulse">●</span> Generating Image
+            </div>
+            
+            <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden shadow-inner">
+                <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-[progress-fill_3s_ease-in-out_infinite]"></div>
+            </div>
+            
+            <div className="w-full flex justify-between mt-3">
+                 <span className="text-xs text-gray-500">Nexus Imageneer</span>
+                 <span className="text-xs text-gray-400 font-mono">~{timeLeft}s</span>
+            </div>
+        </div>
+    );
+};
 
 // --- Hooks ---
 
@@ -306,6 +316,10 @@ const Terminal = () => {
     const [showChat, setShowChat] = useState(false);
     const [shouldAnimate, setShouldAnimate] = useState(false);
     const [isDragOver, setIsDragOver] = useState(false);
+    
+    // Voice State
+    const [isDictating, setIsDictating] = useState(false);
+    const [dictationText, setDictationText] = useState('');
     
     // Config State
     const [modelId, setModelId] = useState('gemini-2.5-flash');
@@ -551,6 +565,38 @@ const Terminal = () => {
             console.error("TTS Error", e);
         }
     };
+    
+    // --- Voice Dictation Logic ---
+    const startDictation = () => {
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            alert("Your browser does not support speech recognition.");
+            return;
+        }
+        
+        setIsDictating(true);
+        setDictationText('');
+        
+        // @ts-ignore
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setDictationText(transcript);
+        };
+
+        recognition.onend = () => {
+            setIsDictating(false);
+            if (dictationText.trim()) {
+                handleSend(dictationText);
+            }
+        };
+        
+        recognition.start();
+    };
 
     // --- Chat Logic ---
 
@@ -592,8 +638,10 @@ const Terminal = () => {
         }
     };
 
-    const handleSend = async () => {
-        if ((!input.trim() && attachments.length === 0) || isLoading) return;
+    const handleSend = async (manualInput?: string) => {
+        const textToSend = manualInput || input;
+        
+        if ((!textToSend.trim() && attachments.length === 0) || isLoading) return;
         
         if (!user) {
             const userMsgCount = messages.filter(m => m.sender === 'user').length;
@@ -608,7 +656,7 @@ const Terminal = () => {
             return;
         }
 
-        const currentInput = input;
+        const currentInput = textToSend;
         const currentAttachments = [...attachments];
         const lowerInput = currentInput.toLowerCase();
         
@@ -778,30 +826,25 @@ const Terminal = () => {
         } catch (err) {
             if (err.name === 'AbortError') return;
             
-            let errorMessage = "Nexus System Error";
-            let errorDetails = err.message || "An unknown error occurred.";
-
+            // Quota Check: Only show error if it is a 429
+            let isQuotaError = false;
             try {
                 const jsonMatch = err.message.match(/\{.*\}/s);
                 if (jsonMatch) {
                     const errorObj = JSON.parse(jsonMatch[0]);
-                    if (errorObj.error) {
-                        if (errorObj.error.code === 429 || errorObj.error.status === 'RESOURCE_EXHAUSTED') {
-                            errorMessage = "⚠️ System Overload (Quota Exceeded)";
-                            errorDetails = "You have reached the free tier generation limit for this model. Please try again in a few minutes or switch models.";
-                        } else {
-                             errorMessage = `System Error (${errorObj.error.code})`;
-                             errorDetails = errorObj.error.message;
-                        }
+                    if (errorObj.error && (errorObj.error.code === 429 || errorObj.error.status === 'RESOURCE_EXHAUSTED')) {
+                        isQuotaError = true;
                     }
                 }
-            } catch (e) {
-                // Failed to parse
-            }
+            } catch(e) {}
 
-            const errorContent = `**${errorMessage}**\n\n${errorDetails}`;
-            
-            setMessages(prev => [...prev, { id: uuidv4(), sender: 'system', content: errorContent, timestamp: Date.now() } as Message]);
+            if (isQuotaError) {
+                const errorContent = `**⚠️ System Overload (Quota Exceeded)**\n\nYou have reached the free tier generation limit for this model. Please try again in a few minutes or switch models.`;
+                setMessages(prev => [...prev, { id: uuidv4(), sender: 'system', content: errorContent, timestamp: Date.now() } as Message]);
+            } else {
+                // Log silent failures to console to avoid cluttering UI as requested
+                console.warn("Generation failed silently:", err);
+            }
         } finally {
             setIsLoading(false);
             abortControllerRef.current = null;
@@ -1172,18 +1215,30 @@ const Terminal = () => {
 
                 <div className={`absolute z-50 flex justify-center pointer-events-auto ${isMobile ? 'bottom-0 left-0 right-0 bg-[#212121] border-t border-gray-800' : 'bottom-6 left-4 right-4'}`}>
                     <div className={`w-full max-w-3xl bg-[#2f2f2f] ${isMobile ? 'rounded-none p-3 border-none' : 'rounded-3xl p-2 shadow-2xl border border-gray-700'} relative focus-within:border-gray-500 transition-colors`}>
-                        <textarea
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
-                            placeholder={isMobile ? "Message..." : "Message Nexus..."}
-                            className="w-full bg-transparent text-gray-100 placeholder-gray-500 px-4 py-2 focus:outline-none resize-none max-h-[150px] min-h-[40px] text-base"
-                            rows={1}
-                            style={{ height: input ? 'auto' : '40px' }}
-                            onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
-                        />
+                        
+                        {isDictating ? (
+                            <div className="w-full h-[40px] flex items-center justify-between px-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                    <span className="text-gray-300 font-medium animate-pulse">Listening...</span>
+                                    <span className="text-gray-500 text-sm truncate max-w-[200px]">{dictationText}</span>
+                                </div>
+                                <button onClick={() => setIsDictating(false)} className="text-gray-400 hover:text-white text-xs">Cancel</button>
+                            </div>
+                        ) : (
+                            <textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }}}
+                                placeholder={isMobile ? "Message..." : "Message Nexus..."}
+                                className="w-full bg-transparent text-gray-100 placeholder-gray-500 px-4 py-2 focus:outline-none resize-none max-h-[150px] min-h-[40px] text-base"
+                                rows={1}
+                                style={{ height: input ? 'auto' : '40px' }}
+                                onInput={(e) => { e.currentTarget.style.height = 'auto'; e.currentTarget.style.height = e.currentTarget.scrollHeight + 'px'; }}
+                            />
+                        )}
 
-                        {attachments.length > 0 && (
+                        {attachments.length > 0 && !isDictating && (
                             <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
                                 {attachments.map((att, i) => (
                                     <div key={i} className="bg-gray-800 text-xs rounded-md px-2 py-1 flex items-center gap-2 border border-gray-600">
@@ -1221,12 +1276,13 @@ const Terminal = () => {
                                 <button onClick={() => { setUseDeepResearch(!useDeepResearch); if (!useDeepResearch) { setUseThinking(false); setUseSearch(true); } }} className={`p-2 rounded-full transition-colors ${useDeepResearch ? 'bg-teal-500/20 text-teal-400' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-700'}`} title="Deep Research Mode"><LightbulbIcon active={useDeepResearch} /></button>
                             </div>
                             <div className="flex items-center space-x-2">
+                                 <button onClick={startDictation} className={`p-2 rounded-full transition-colors ${isDictating ? 'bg-red-500/20 text-red-400' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`} title="Voice Dictation"><MicIcon active={isDictating} /></button>
                                 {isLoading ? (
                                     <button onClick={handleStop} className="p-2 rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/40 transition-all" title="Stop Generation">
                                         <StopIcon />
                                     </button>
                                 ) : (
-                                    <button onClick={handleSend} disabled={!input.trim() && attachments.length === 0} className={`p-2 rounded-full transition-all duration-200 ${input.trim() || attachments.length > 0 ? 'bg-white text-black hover:bg-gray-200' : 'bg-[#3f3f3f] text-gray-500 cursor-not-allowed'}`}><SendIcon /></button>
+                                    <button onClick={() => handleSend()} disabled={!input.trim() && attachments.length === 0 && !isDictating} className={`p-2 rounded-full transition-all duration-200 ${input.trim() || attachments.length > 0 ? 'bg-white text-black hover:bg-gray-200' : 'bg-[#3f3f3f] text-gray-500 cursor-not-allowed'}`}><SendIcon /></button>
                                 )}
                             </div>
                         </div>
