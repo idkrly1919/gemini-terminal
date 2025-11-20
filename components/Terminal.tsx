@@ -358,7 +358,12 @@ const Terminal = () => {
 
     // Debug API Key presence on mount
     useEffect(() => {
-        console.log("API Key Configured:", API_KEY ? "YES" : "NO (Check VITE_API_KEY in Cloudflare Settings)");
+        const keyStatus = API_KEY ? `Present (Length: ${API_KEY.length})` : "MISSING";
+        console.log(`[DEBUG] API Key Status: ${keyStatus}`);
+        
+        if (!API_KEY) {
+             console.error("[CRITICAL] VITE_API_KEY is missing in environment variables. Please check Cloudflare Pages Settings > Environment Variables.");
+        }
     }, []);
 
     // --- Google Drive Integration & Persistence ---
@@ -581,7 +586,7 @@ const Terminal = () => {
         if ((!input.trim() && attachments.length === 0) || isLoading) return;
         
         if (!API_KEY) {
-            alert("API Key is missing or invalid. Please check your Cloudflare environment variables.");
+            addMessage('system', "CRITICAL ERROR: API Key is missing. Please check your Cloudflare Environment Variables (VITE_API_KEY).");
             return;
         }
 
@@ -760,7 +765,16 @@ const Terminal = () => {
             ));
 
         } catch (err) {
-            addMessage('system', `Nexus System Error: ${err.message}`);
+            let errorMessage = `Nexus System Error: ${err.message}`;
+            
+            // Custom Error Handling for Common Issues
+            if (err.message && err.message.includes('Failed to fetch')) {
+                 errorMessage += "\n\n**POSSIBLE CAUSES:**\n1. **Google Cloud Restrictions:** Your API Key might be restricted to specific domains. Go to Google Cloud Console > Credentials > API Key > Website Restrictions and add `https://*.pages.dev/*`.\n2. **Ad Blockers:** uBlock Origin can block Google API calls. Try disabling it for this site.\n3. **Invalid API Key:** The key stored in Cloudflare might be incorrect.";
+            } else if (err.message && err.message.includes('400')) {
+                 errorMessage += "\n\n**API Key Invalid:** The API key provided is rejected by Google. Check your Cloudflare Environment Variables.";
+            }
+
+            addMessage('system', errorMessage);
         } finally {
             setIsLoading(false);
         }
